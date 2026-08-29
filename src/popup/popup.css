@@ -32,6 +32,19 @@ h2 {
   font-size: 0.8rem;
 }
 
+legend {
+  margin-bottom: 0.55rem;
+  font-size: 0.75rem;
+}
+
+fieldset + fieldset {
+  margin-top: 0.9rem;
+}
+
+fieldset:not(:last-of-type) {
+  padding-bottom: 0.9rem;
+}
+
 label {
   margin-bottom: 0.6rem;
   font-size: 0.9rem;
