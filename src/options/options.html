@@ -108,6 +108,15 @@
                 <option value="every">every time</option>
               </select>
             </label>
+
+            <label>
+              Cooldown <span class="optional">seconds</span>
+              <input name="cooldownSeconds" type="number" min="0" max="3600" step="1" />
+              <small>
+                The shortest gap between two blips from this watch, so a page that flickers cannot
+                blip twice for one change. Set it to 0 to blip on every change.
+              </small>
+            </label>
           </div>
 
           <div class="row">

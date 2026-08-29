@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_PRIORITY, DEFAULT_SERVER } from "../core/watch.js";
+import { DEFAULT_COOLDOWN_SECONDS, DEFAULT_PRIORITY, DEFAULT_SERVER } from "../core/watch.js";
 import { blankDraft, draftFrom, valuesFrom } from "./form.js";
 
 const values = {
@@ -14,6 +14,7 @@ const values = {
   message: "",
   priority: "5",
   repeat: "every",
+  cooldownSeconds: "5",
   refresh: "off",
   refreshMinutes: "",
 };
@@ -28,6 +29,7 @@ describe("draftFrom", () => {
       server: "https://blipr.dev",
       priority: 5,
       once: false,
+      cooldownSeconds: 5,
     });
   });
 
@@ -68,6 +70,23 @@ describe("draftFrom", () => {
   });
 });
 
+describe("draftFrom, cooldown", () => {
+  it("reads a cleared box as no cooldown at all, not as the default", () => {
+    expect(draftFrom({ ...values, cooldownSeconds: "" }).cooldownSeconds).toBe(0);
+    expect(draftFrom({ ...values, cooldownSeconds: " 0 " }).cooldownSeconds).toBe(0);
+  });
+
+  it("keeps a longer window the user asked for", () => {
+    expect(draftFrom({ ...values, cooldownSeconds: " 90 " }).cooldownSeconds).toBe(90);
+  });
+
+  it("falls back to the default rather than saving nonsense", () => {
+    expect(draftFrom({ ...values, cooldownSeconds: "abc" }).cooldownSeconds).toBe(
+      DEFAULT_COOLDOWN_SECONDS,
+    );
+  });
+});
+
 describe("valuesFrom", () => {
   it("round-trips a draft back through the controls", () => {
     const draft = draftFrom({ ...values, token: "tok" });
@@ -87,5 +106,17 @@ describe("valuesFrom", () => {
     const blank = valuesFrom(blankDraft({}, "https://example.com/*"));
     expect(blank.refresh).toBe("off");
     expect(blank.refreshMinutes).toBe("");
+  });
+
+  it("starts a new watch on the default cooldown, not on a blank box", () => {
+    expect(valuesFrom(blankDraft({}, "https://example.com/*")).cooldownSeconds).toBe(
+      String(DEFAULT_COOLDOWN_SECONDS),
+    );
+  });
+
+  it("shows a watch saved before cooldowns existed the default it is getting", () => {
+    const legacy = draftFrom(values);
+    delete legacy.cooldownSeconds;
+    expect(valuesFrom(legacy).cooldownSeconds).toBe(String(DEFAULT_COOLDOWN_SECONDS));
   });
 });

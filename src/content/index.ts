@@ -8,6 +8,7 @@ import { GRACE_MS, createdState, initialState, step } from "../core/edges.js";
 import { tryCount } from "../core/selector.js";
 import type { Watch } from "../core/watch.js";
 import { onMessage, send } from "../messages.js";
+import { DOM_CHANGES } from "./observe.js";
 import { arm } from "./picker.js";
 
 type LiveWatch = Pick<Watch, "id" | "selector" | "condition" | "watchingSince">;
@@ -128,11 +129,7 @@ function seedFor(watch: LiveWatch, matches: number): EdgeState {
 
 function observe(): void {
   observer ??= new MutationObserver(schedule);
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-  });
+  observer.observe(document.documentElement, DOM_CHANGES);
   // The interval covers pages that render late; the one-shot covers the grace period
   // for a "gone" watch whose selector never matched here at all.
   poll ??= setInterval(check, POLL_MS);

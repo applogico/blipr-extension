@@ -77,7 +77,15 @@
                 <option value="every">every time</option>
               </select>
             </label>
+
+            <label>
+              Cooldown <span class="optional">seconds</span>
+              <input name="cooldownSeconds" type="number" min="0" max="3600" step="1" />
+            </label>
           </div>
+          <p class="hint">
+            Cooldown is the shortest gap between two blips from this watch. 0 blips on every change.
+          </p>
 
           <div class="row">
             <label>

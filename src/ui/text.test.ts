@@ -58,4 +58,14 @@ describe("statusText", () => {
     expect(statusText(watch, now)).toBe("Waiting");
     expect(statusText({ ...watch, lastFiredAt: now - 5 * 60_000 }, now)).toBe("Blipped 5 min ago");
   });
+
+  it("says a blip was skipped rather than leaving the user to wonder", () => {
+    const skipped = { ...watch, lastFiredAt: now - 10_000, lastSuppressedAt: now - 5_000 };
+    expect(statusText(skipped, now)).toBe("Blipped just now — Skipped a blip just now (cooldown)");
+  });
+
+  it("drops the skip notice once a later blip has gone out", () => {
+    const recovered = { ...watch, lastSuppressedAt: now - 10 * 60_000, lastFiredAt: now };
+    expect(statusText(recovered, now)).toBe("Blipped just now");
+  });
 });

@@ -7,6 +7,7 @@ import { messageFor } from "../core/message.js";
 import type { PublishOutcome } from "../core/publish.js";
 import { publish } from "../core/publish.js";
 import type { Watch, WatchDraft } from "../core/watch.js";
+import { cooldownSecondsOf } from "../core/watch.js";
 import type { WatchPatch } from "../storage.js";
 import { patchWatch } from "../storage.js";
 
@@ -25,7 +26,11 @@ export async function attempt(draft: WatchDraft, blip: Blip): Promise<PublishOut
 
 export async function fire(watch: Watch, occasion: Occasion): Promise<void> {
   const now = Date.now();
-  if (!watch.enabled || inCooldown(watch.lastFiredAt, now)) return;
+  if (!watch.enabled) return;
+  if (inCooldown(watch.lastFiredAt, now, cooldownSecondsOf(watch))) {
+    await patchWatch(watch.id, { lastSuppressedAt: now });
+    return;
+  }
   // Claim the slot before publishing, so two tabs cannot both send the same blip.
   await patchWatch(watch.id, { lastFiredAt: now });
   await patchWatch(watch.id, recordOf(watch, await attempt(watch, messageFor(watch, occasion))));

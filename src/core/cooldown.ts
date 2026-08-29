@@ -6,12 +6,11 @@
  * cooldown is a stored timestamp compared against now, and the one retry is
  * awaited inside the message handler that is already keeping the worker alive.
  */
-export const COOLDOWN_MS = 60_000;
 export const RETRY_DELAY_MS = 2_000;
 export const MAX_ATTEMPTS = 2;
 
-export function inCooldown(lastFiredAt: number | undefined, now: number): boolean {
-  return lastFiredAt !== undefined && now - lastFiredAt < COOLDOWN_MS;
+export function inCooldown(lastFiredAt: number | undefined, now: number, seconds: number): boolean {
+  return seconds > 0 && lastFiredAt !== undefined && now - lastFiredAt < seconds * 1_000;
 }
 
 export function shouldRetry(attempt: number, retryable: boolean): boolean {

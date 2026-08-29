@@ -22,6 +22,7 @@ const parked: WatchDraft = {
   message: "{matches} left on {url}",
   priority: 4,
   once: false,
+  cooldownSeconds: 30,
   refresh: true,
   refreshMinutes: 15,
 };

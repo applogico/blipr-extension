@@ -29,7 +29,16 @@ export function statusText(watch: Watch, now = Date.now()): string {
   if (watch.lastError) parts.push(watch.lastError);
   else if (watch.lastFiredAt !== undefined) parts.push(`Blipped ${when(watch.lastFiredAt, now)}`);
   else parts.push("Waiting");
+  const dropped = suppressedAt(watch);
+  if (dropped !== undefined) parts.push(`Skipped a blip ${when(dropped, now)} (cooldown)`);
   return parts.join(" — ");
+}
+
+/** Only worth saying while the skip is newer than the blip that caused it. */
+function suppressedAt(watch: Watch): number | undefined {
+  const { lastSuppressedAt } = watch;
+  if (lastSuppressedAt === undefined) return undefined;
+  return lastSuppressedAt > (watch.lastFiredAt ?? 0) ? lastSuppressedAt : undefined;
 }
 
 function when(timestamp: number, now: number): string {

@@ -1,7 +1,12 @@
 // The watch form, in and out. The mapping between what the controls hold and
 // what a `WatchDraft` is lives in `draftFrom`/`valuesFrom`, away from the DOM.
 import type { Condition, Watch, WatchDraft } from "../core/watch.js";
-import { DEFAULT_PRIORITY, DEFAULT_SERVER } from "../core/watch.js";
+import {
+  DEFAULT_COOLDOWN_SECONDS,
+  DEFAULT_PRIORITY,
+  DEFAULT_SERVER,
+  cooldownSecondsOf,
+} from "../core/watch.js";
 import type { WatchDefaults } from "../storage.js";
 
 const FIELDS = [
@@ -15,6 +20,7 @@ const FIELDS = [
   "message",
   "priority",
   "repeat",
+  "cooldownSeconds",
   "refresh",
   "refreshMinutes",
 ] as const;
@@ -35,12 +41,19 @@ export function draftFrom(values: FormValues, id?: string): WatchDraft {
     server: values.server.trim() || DEFAULT_SERVER,
     priority: Number.isInteger(priority) && priority > 0 ? priority : DEFAULT_PRIORITY,
     once: values.repeat === "once",
+    cooldownSeconds: cooldownFrom(values.cooldownSeconds),
     ...refreshFrom(values),
     ...(token ? { token } : {}),
     ...(title ? { title } : {}),
     ...(message ? { message } : {}),
     ...(id ? { id } : {}),
   };
+}
+
+/** A cleared box is a deliberate zero: no cooldown, blip on every transition. */
+function cooldownFrom(value: string): number {
+  const seconds = Number(value.trim());
+  return Number.isInteger(seconds) && seconds >= 0 ? seconds : DEFAULT_COOLDOWN_SECONDS;
 }
 
 /** A blank interval is no interval at all, rather than a zero. */
@@ -64,6 +77,7 @@ export function valuesFrom(draft: WatchDraft): FormValues {
     message: draft.message ?? "",
     priority: String(draft.priority),
     repeat: draft.once ? "once" : "every",
+    cooldownSeconds: String(cooldownSecondsOf(draft)),
     refresh: draft.refresh ? "on" : "off",
     refreshMinutes: draft.refreshMinutes === undefined ? "" : String(draft.refreshMinutes),
   };
@@ -79,6 +93,7 @@ export function blankDraft(defaults: WatchDefaults, urlPattern: string): WatchDr
     server: defaults.server ?? DEFAULT_SERVER,
     priority: defaults.priority ?? DEFAULT_PRIORITY,
     once: true,
+    cooldownSeconds: DEFAULT_COOLDOWN_SECONDS,
     ...(defaults.token ? { token: defaults.token } : {}),
   };
 }
@@ -93,6 +108,7 @@ export function toDraft(watch: Watch): WatchDraft {
     server: watch.server,
     priority: watch.priority,
     once: watch.once,
+    cooldownSeconds: cooldownSecondsOf(watch),
     ...(watch.refresh ? { refresh: true } : {}),
     ...(watch.refreshMinutes === undefined ? {} : { refreshMinutes: watch.refreshMinutes }),
     ...(watch.token ? { token: watch.token } : {}),

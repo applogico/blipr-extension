@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WatchDraft } from "./watch.js";
-import { MAX_REFRESH_MINUTES, validate } from "./watch.js";
+import { MAX_COOLDOWN_SECONDS, MAX_REFRESH_MINUTES, validate } from "./watch.js";
 
 const draft: WatchDraft = {
   urlPattern: "https://example.com/*",
@@ -59,5 +59,23 @@ describe("validate, refresh", () => {
 
   it("checks a stored interval even while refreshing is switched off", () => {
     expect(validate({ ...draft, refresh: false, refreshMinutes: 0 })).toHaveLength(1);
+  });
+});
+
+describe("validate, cooldown", () => {
+  it("leaves a watch that never set one alone", () => {
+    expect(validate(draft)).toEqual([]);
+  });
+
+  it("takes zero, which turns the cooldown off", () => {
+    expect(validate({ ...draft, cooldownSeconds: 0 })).toEqual([]);
+    expect(validate({ ...draft, cooldownSeconds: MAX_COOLDOWN_SECONDS })).toEqual([]);
+  });
+
+  it("refuses negatives, halves, nonsense, and more than the ceiling", () => {
+    expect(validate({ ...draft, cooldownSeconds: -1 })).toHaveLength(1);
+    expect(validate({ ...draft, cooldownSeconds: 0.5 })).toHaveLength(1);
+    expect(validate({ ...draft, cooldownSeconds: Number.NaN })).toHaveLength(1);
+    expect(validate({ ...draft, cooldownSeconds: MAX_COOLDOWN_SECONDS + 1 })).toHaveLength(1);
   });
 });
