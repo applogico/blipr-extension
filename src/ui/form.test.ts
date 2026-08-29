@@ -6,6 +6,7 @@ import { blankDraft, draftFrom, valuesFrom } from "./form.js";
 const values = {
   urlPattern: " https://example.com/* ",
   selector: " .spinner ",
+  containsText: "",
   condition: "gone",
   topic: " ci ",
   server: " https://blipr.dev ",
@@ -81,6 +82,17 @@ describe("draftFrom, cooldown", () => {
   });
 });
 
+describe("draftFrom, containsText", () => {
+  it("leaves the text filter out entirely when the field is blank", () => {
+    expect(draftFrom(values)).not.toHaveProperty("containsText");
+    expect(draftFrom({ ...values, containsText: "   " })).not.toHaveProperty("containsText");
+  });
+
+  it("trims what the user typed but keeps the case they typed it in", () => {
+    expect(draftFrom({ ...values, containsText: " Sold Out " }).containsText).toBe("Sold Out");
+  });
+});
+
 describe("valuesFrom", () => {
   it("round-trips a draft back through the controls", () => {
     const draft = draftFrom(values);
@@ -89,6 +101,15 @@ describe("valuesFrom", () => {
 
   it("puts a fire-once watch on the 'once' option", () => {
     expect(valuesFrom(blankDraft({}, "https://example.com/*")).repeat).toBe("once");
+  });
+
+  it("round-trips a draft with a text filter", () => {
+    const draft = draftFrom({ ...values, containsText: "Sold out" });
+    expect(draftFrom(valuesFrom(draft))).toEqual(draft);
+  });
+
+  it("shows a blank box for a watch with no text filter", () => {
+    expect(valuesFrom(draftFrom(values)).containsText).toBe("");
   });
 
   it("round-trips a refreshing draft too", () => {

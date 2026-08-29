@@ -14,6 +14,7 @@ import { draftFrom, fillForm, readForm } from "./form.js";
 const parked: WatchDraft = {
   urlPattern: "https://example.com/tickets*",
   selector: ".ticket-row .buy-button",
+  containsText: "Sold out",
   condition: "gone",
   topic: "tickets",
   server: "https://blipr.dev",

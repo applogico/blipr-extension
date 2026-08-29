@@ -5,6 +5,8 @@ export type Watch = {
   /** Matched against the whole URL; `*` is the only wildcard. */
   urlPattern: string;
   selector: string;
+  /** Only elements whose visible text contains this, compared case-insensitively. */
+  containsText?: string;
   condition: Condition;
   topic: string;
   server: string;

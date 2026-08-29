@@ -61,10 +61,10 @@ onMessage({
     return takePick(tabId);
   },
 
-  countMatches: async ({ tabId, selector }) => {
+  countMatches: async ({ tabId, selector, containsText }) => {
     try {
       await ensureContentScript(tabId);
-      return await sendToTab(tabId, { kind: "countMatches", tabId, selector });
+      return await sendToTab(tabId, { kind: "countMatches", tabId, selector, containsText });
     } catch {
       return { error: UNREACHABLE };
     }
@@ -131,11 +131,12 @@ async function settled(draft: WatchDraft): Promise<Watch> {
 
 /** All a content script is ever told about a watch: no topic, no server. */
 function live(watch: Watch): Responses["watchesForUrl"][number] {
-  const { id, selector, condition, watchingSince } = watch;
+  const { id, selector, containsText, condition, watchingSince } = watch;
   return {
     id,
     selector,
     condition,
+    ...(containsText === undefined ? {} : { containsText }),
     ...(watchingSince === undefined ? {} : { watchingSince }),
   };
 }

@@ -11,7 +11,7 @@ import { onMessage, send } from "../messages.js";
 import { DOM_CHANGES } from "./observe.js";
 import { arm } from "./picker.js";
 
-type LiveWatch = Pick<Watch, "id" | "selector" | "condition" | "watchingSince">;
+type LiveWatch = Pick<Watch, "id" | "selector" | "containsText" | "condition" | "watchingSince">;
 
 const POLL_MS = 5_000;
 const DEBOUNCE_MS = 250;
@@ -50,7 +50,7 @@ function start(): void {
       });
       return undefined; // the pick comes back as its own message, not as a reply
     },
-    countMatches: ({ selector }) => tryCount(document, selector),
+    countMatches: ({ selector, containsText }) => tryCount(document, selector, containsText),
   });
   browser.storage.onChanged.addListener(() => void refresh());
   void refresh();
@@ -98,7 +98,7 @@ function check(): void {
 }
 
 function inspect(watch: LiveWatch): void {
-  const counted = tryCount(document, watch.selector);
+  const counted = tryCount(document, watch.selector, watch.containsText);
   if ("error" in counted) {
     // A selector that will not parse never will, so it is reported once and dropped.
     broken.add(watch.id);

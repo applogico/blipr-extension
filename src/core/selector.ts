@@ -1,3 +1,5 @@
+import { countMatchingText } from "./textmatch.js";
+
 export type SelectorPick = {
   /** Matches only the element that was clicked. */
   unique: string;
@@ -110,10 +112,18 @@ export function pick(el: Element, root: ParentNode = el.ownerDocument): Selector
 export function tryCount(
   root: ParentNode,
   selector: string,
+  containsText = "",
 ): { matches: number } | { error: string } {
   try {
-    return { matches: root.querySelectorAll(selector).length };
+    const found = Array.from(root.querySelectorAll(selector));
+    return { matches: countMatchingText(found.map(visibleText), containsText) };
   } catch {
     return { error: "That is not a valid CSS selector." };
   }
+}
+
+/** `innerText` is what a reader sees. jsdom has none, where textContent is close enough. */
+function visibleText(el: Element): string {
+  if ("innerText" in el && typeof el.innerText === "string") return el.innerText;
+  return el.textContent;
 }

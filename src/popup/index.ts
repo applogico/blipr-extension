@@ -131,12 +131,12 @@ function armPicker(): Promise<boolean> {
 }
 
 async function onCheck(): Promise<void> {
-  const selector = currentDraft().selector;
-  if (!selector) {
+  const draft = currentDraft();
+  if (!draft.selector) {
     show(checkResult, "Type or pick a selector first.", "warn");
     return;
   }
-  const matches = await count(selector);
+  const matches = await count(draft.selector, draft.containsText ?? "");
   if (matches === null) {
     show(checkResult, UNREACHABLE, "bad");
     return;
@@ -150,7 +150,8 @@ async function offer(pick: SelectorPick): Promise<void> {
   if (pick.similar && pick.similar.selector !== pick.unique) {
     choices.push({ label: "All similar", selector: pick.similar.selector, strict: false });
   }
-  const counts = await Promise.all(choices.map((choice) => count(choice.selector)));
+  const containsText = currentDraft().containsText ?? "";
+  const counts = await Promise.all(choices.map((choice) => count(choice.selector, containsText)));
   chips.replaceChildren(
     ...choices.map((choice, index) =>
       chip(choice, counts[index] ?? null, () => {
@@ -196,8 +197,10 @@ async function refresh(): Promise<void> {
   const watches = (await getWatches()).filter((watch) => matchesUrl(watch.urlPattern, page.url));
   current.hidden = watches.length === 0;
   if (watches.length === 0) return;
-  const counted = await Promise.all(watches.map((watch) => count(watch.selector)));
-  const pairs = watches.map((watch, index) => [watch.selector, counted[index] ?? 0] as const);
+  const counted = await Promise.all(
+    watches.map((watch) => count(watch.selector, watch.containsText ?? "")),
+  );
+  const pairs = watches.map((watch, index) => [watch.id, counted[index] ?? 0] as const);
   renderList(list, watches, { actions: [REFRESH_TOGGLE], counts: Object.fromEntries(pairs) });
 }
 
@@ -212,8 +215,13 @@ async function onRowAction(event: Event): Promise<void> {
 }
 
 /** null when the page cannot be reached at all, which is not the same as zero. */
-async function count(selector: string): Promise<number | null> {
-  const counted = await send({ kind: "countMatches", tabId: page.id, selector }).catch(() => null);
+async function count(selector: string, containsText: string): Promise<number | null> {
+  const counted = await send({
+    kind: "countMatches",
+    tabId: page.id,
+    selector,
+    containsText,
+  }).catch(() => null);
   if (!counted || "error" in counted) return null;
   return counted.matches;
 }

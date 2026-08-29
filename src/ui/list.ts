@@ -30,7 +30,7 @@ export function renderList(root: HTMLElement, watches: Watch[], options: Options
 }
 
 function row(watch: Watch, { actions = [], counts }: Options): HTMLElement {
-  const live = counts?.[watch.selector];
+  const live = counts?.[watch.id];
   const offered = actions.filter((action) => action.when?.(watch) ?? true);
   return el("article", { className: watch.enabled ? "watch" : "watch off" }, [
     el("div", { className: "watch-head" }, [

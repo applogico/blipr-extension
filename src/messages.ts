@@ -20,14 +20,16 @@ export type Message =
   /** Popup reads and clears the pick stashed for its tab. */
   | { kind: "takePick"; tabId: number }
   /** Popup or options counts what a selector matches on a tab right now. */
-  | { kind: "countMatches"; tabId: number; selector: string }
+  | { kind: "countMatches"; tabId: number; selector: string; containsText: string }
   /** Save a watch, requesting host access for its origin first. */
   | { kind: "saveWatch"; draft: WatchDraft }
   /** Publish once, without touching the watch's cooldown or fire-once state. */
   | { kind: "testWatch"; draft: WatchDraft };
 
 export type Responses = {
-  watchesForUrl: Array<Pick<Watch, "id" | "selector" | "condition" | "watchingSince">>;
+  watchesForUrl: Array<
+    Pick<Watch, "id" | "selector" | "containsText" | "condition" | "watchingSince">
+  >;
   conditionMet: undefined;
   watchError: undefined;
   armPicker: undefined;

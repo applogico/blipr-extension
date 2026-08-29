@@ -79,6 +79,35 @@ describe("tryCount", () => {
   });
 });
 
+describe("tryCount, text filter", () => {
+  it("counts only the elements whose text contains the filter", () => {
+    html(`<b class="x">Sold out</b><b class="x">In stock</b><b class="x">SOLD OUT today</b>`);
+    expect(tryCount(document, ".x", "sold out")).toEqual({ matches: 2 });
+  });
+
+  it("counts everything when the filter is blank", () => {
+    html(`<b class="x">Sold out</b><b class="x">In stock</b>`);
+    expect(tryCount(document, ".x", "")).toEqual({ matches: 2 });
+    expect(tryCount(document, ".x")).toEqual({ matches: 2 });
+  });
+
+  it("counts nothing when the filter matches nothing", () => {
+    html(`<b class="x">In stock</b>`);
+    expect(tryCount(document, ".x", "Sold out")).toEqual({ matches: 0 });
+  });
+
+  it("sees through the whitespace the markup puts in the element", () => {
+    html(`<b class="x">\n      Sold\n      out\n    </b>`);
+    expect(tryCount(document, ".x", "Sold out")).toEqual({ matches: 1 });
+  });
+
+  it("still reports an unusable selector rather than counting", () => {
+    expect(tryCount(document, "((", "Sold out")).toEqual({
+      error: "That is not a valid CSS selector.",
+    });
+  });
+});
+
 describe("shapeOf", () => {
   it("labels an element by what it is, ignoring generated classes", () => {
     html(`<i class="spinner css-1a2b3c4d"></i>`);

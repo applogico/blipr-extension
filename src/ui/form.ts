@@ -12,6 +12,7 @@ import type { WatchDefaults } from "../storage.js";
 const FIELDS = [
   "urlPattern",
   "selector",
+  "containsText",
   "condition",
   "topic",
   "server",
@@ -28,6 +29,7 @@ type Field = (typeof FIELDS)[number];
 export type FormValues = Record<Field, string>;
 
 export function draftFrom(values: FormValues, id?: string): WatchDraft {
+  const containsText = values.containsText.trim();
   const title = values.title.trim();
   const message = values.message.trim();
   const priority = Number(values.priority.trim());
@@ -41,6 +43,7 @@ export function draftFrom(values: FormValues, id?: string): WatchDraft {
     once: values.repeat === "once",
     cooldownSeconds: cooldownFrom(values.cooldownSeconds),
     ...refreshFrom(values),
+    ...(containsText ? { containsText } : {}),
     ...(title ? { title } : {}),
     ...(message ? { message } : {}),
     ...(id ? { id } : {}),
@@ -66,6 +69,7 @@ export function valuesFrom(draft: WatchDraft): FormValues {
   return {
     urlPattern: draft.urlPattern,
     selector: draft.selector,
+    containsText: draft.containsText ?? "",
     condition: draft.condition,
     topic: draft.topic,
     server: draft.server,
@@ -99,6 +103,7 @@ export function toDraft(watch: Watch): WatchDraft {
     urlPattern: watch.urlPattern,
     selector: watch.selector,
     condition: watch.condition,
+    ...(watch.containsText ? { containsText: watch.containsText } : {}),
     topic: watch.topic,
     server: watch.server,
     priority: watch.priority,
