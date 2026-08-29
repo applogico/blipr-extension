@@ -104,7 +104,7 @@ browser's extension settings.
 
 ## Privacy
 
-Config and tokens live in `chrome.storage.local` on the machine you typed them into. They are never
+Your watches live in `chrome.storage.local` on the machine you typed them into. They are never
 synced, and never reach a content script. The extension talks to exactly one server — the one you
 configured — and to nothing else. No analytics, no telemetry, no remote code.
 

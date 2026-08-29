@@ -1,6 +1,6 @@
 // The page half: watch the DOM for the selectors that apply to this URL and
-// report the edges. It is handed only `{id, selector, condition}` — a token
-// never reaches a content script.
+// report the edges. It is handed only `{id, selector, condition}` — where a
+// watch publishes never reaches a content script.
 import browser from "webextension-polyfill";
 
 import type { EdgeState } from "../core/edges.js";

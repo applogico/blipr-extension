@@ -129,7 +129,7 @@ async function settled(draft: WatchDraft): Promise<Watch> {
   };
 }
 
-/** All a content script is ever told about a watch: no topic, no server, no token. */
+/** All a content script is ever told about a watch: no topic, no server. */
 function live(watch: Watch): Responses["watchesForUrl"][number] {
   const { id, selector, condition, watchingSince } = watch;
   return {

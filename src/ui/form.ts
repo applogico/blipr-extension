@@ -15,7 +15,6 @@ const FIELDS = [
   "condition",
   "topic",
   "server",
-  "token",
   "title",
   "message",
   "priority",
@@ -29,7 +28,6 @@ type Field = (typeof FIELDS)[number];
 export type FormValues = Record<Field, string>;
 
 export function draftFrom(values: FormValues, id?: string): WatchDraft {
-  const token = values.token.trim();
   const title = values.title.trim();
   const message = values.message.trim();
   const priority = Number(values.priority.trim());
@@ -43,7 +41,6 @@ export function draftFrom(values: FormValues, id?: string): WatchDraft {
     once: values.repeat === "once",
     cooldownSeconds: cooldownFrom(values.cooldownSeconds),
     ...refreshFrom(values),
-    ...(token ? { token } : {}),
     ...(title ? { title } : {}),
     ...(message ? { message } : {}),
     ...(id ? { id } : {}),
@@ -72,7 +69,6 @@ export function valuesFrom(draft: WatchDraft): FormValues {
     condition: draft.condition,
     topic: draft.topic,
     server: draft.server,
-    token: draft.token ?? "",
     title: draft.title ?? "",
     message: draft.message ?? "",
     priority: String(draft.priority),
@@ -94,7 +90,6 @@ export function blankDraft(defaults: WatchDefaults, urlPattern: string): WatchDr
     priority: defaults.priority ?? DEFAULT_PRIORITY,
     once: true,
     cooldownSeconds: DEFAULT_COOLDOWN_SECONDS,
-    ...(defaults.token ? { token: defaults.token } : {}),
   };
 }
 
@@ -111,7 +106,6 @@ export function toDraft(watch: Watch): WatchDraft {
     cooldownSeconds: cooldownSecondsOf(watch),
     ...(watch.refresh ? { refresh: true } : {}),
     ...(watch.refreshMinutes === undefined ? {} : { refreshMinutes: watch.refreshMinutes }),
-    ...(watch.token ? { token: watch.token } : {}),
     ...(watch.title ? { title: watch.title } : {}),
     ...(watch.message ? { message: watch.message } : {}),
   };

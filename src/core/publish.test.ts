@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { publish, publishUrl } from "./publish.js";
+import { publish } from "./publish.js";
 import { DEFAULT_SERVER } from "./watch.js";
 
 const draft = {
@@ -15,48 +15,46 @@ const draft = {
 
 const blip = { title: "It's gone", message: ".spinner is no longer on the page." };
 
+// The SDK reads the stored message back, so even a success needs a JSON body.
 const responding = (status: number) =>
-  vi.fn(() => Promise.resolve(new Response(null, { status }))) as unknown as typeof fetch;
+  vi.fn(() =>
+    Promise.resolve(
+      new Response(status === 200 ? JSON.stringify({ id: "m1", topic: "ci" }) : null, {
+        status,
+        headers: { "content-type": "application/json" },
+      }),
+    ),
+  ) as unknown as typeof fetch;
 
-const initOf = (fetchImpl: typeof fetch, index: number): RequestInit | undefined => {
+const callOf = (fetchImpl: typeof fetch, index: number) => {
   const call = vi.mocked(fetchImpl).mock.calls[index];
   if (!call) throw new Error(`fetch has no call ${index}`);
-  return call[1];
+  const [target, init] = call;
+  if (typeof target !== "string") throw new Error("the SDK passed a URL we cannot read");
+  return { url: target, init };
 };
 
-describe("publishUrl", () => {
-  it("encodes a protected topic as two segments", () => {
-    expect(publishUrl(DEFAULT_SERVER, "@alice/tickets")).toBe(
-      "https://blipr.dev/api/notify/%40alice/tickets",
-    );
-  });
-
-  it("does not double the slash on a server with a trailing one", () => {
-    expect(publishUrl("https://blipr.dev/", "ci")).toBe("https://blipr.dev/api/notify/ci");
-  });
-});
+const headersOf = (fetchImpl: typeof fetch, index: number) =>
+  (callOf(fetchImpl, index).init?.headers ?? {}) as Record<string, string>;
 
 describe("publish", () => {
-  it("sends the token only when there is one", async () => {
+  it("posts to the topic, with no double slash on a server that has one", async () => {
     const fetchImpl = responding(200);
     await publish(draft, blip, fetchImpl);
-    const init = initOf(fetchImpl, 0);
-    expect((init?.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect(callOf(fetchImpl, 0).url).toBe("https://blipr.dev/blip/ci");
 
-    await publish({ ...draft, token: " tok " }, blip, fetchImpl);
-    const withToken = initOf(fetchImpl, 1);
-    expect((withToken?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+    await publish({ ...draft, server: "https://blipr.dev/" }, blip, fetchImpl);
+    expect(callOf(fetchImpl, 1).url).toBe("https://blipr.dev/blip/ci");
   });
 
   it("sends the blip it is given, with the watch's priority", async () => {
     const fetchImpl = responding(200);
     await publish(draft, { title: "Blipr", message: "Test blip." }, fetchImpl);
-    const init = initOf(fetchImpl, 0);
-    expect(JSON.parse(init?.body as string)).toEqual({
-      title: "Blipr",
-      message: "Test blip.",
-      priority: 3,
-    });
+    const { init } = callOf(fetchImpl, 0);
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBe("Test blip.");
+    expect(headersOf(fetchImpl, 0)["X-Title"]).toBe("Blipr");
+    expect(headersOf(fetchImpl, 0)["X-Priority"]).toBe("3");
   });
 
   it("never retries a refusal, and says what to do about a missing topic", async () => {
@@ -65,6 +63,17 @@ describe("publish", () => {
       ok: false,
       retryable: false,
       message: "That topic does not exist yet. Create it in the Blipr app first.",
+    });
+  });
+
+  it("treats a refused publish and a spent allowance as final", async () => {
+    for (const status of [401, 403]) {
+      expect(await publish(draft, blip, responding(status))).toMatchObject({ retryable: false });
+    }
+    expect(await publish(draft, blip, responding(402))).toEqual({
+      ok: false,
+      retryable: false,
+      message: "That topic hit its limit for today.",
     });
   });
 
@@ -77,5 +86,14 @@ describe("publish", () => {
       Promise.reject(new TypeError("network")),
     ) as unknown as typeof fetch;
     expect(await publish(draft, blip, offline)).toMatchObject({ retryable: true });
+  });
+
+  it("refuses a topic it cannot address without sending anything", async () => {
+    const fetchImpl = responding(200);
+    const result = await publish({ ...draft, topic: "@alice/tickets" }, blip, fetchImpl);
+    if (result.ok) throw new Error("expected the topic to be refused");
+    expect(result.retryable).toBe(false);
+    expect(result.message).toContain("@alice/tickets");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,6 @@ const values = {
   condition: "gone",
   topic: " ci ",
   server: " https://blipr.dev ",
-  token: "  ",
   title: "  ",
   message: "",
   priority: "5",
@@ -50,11 +49,6 @@ describe("draftFrom", () => {
     expect(paused.refreshMinutes).toBe(15);
   });
 
-  it("leaves the token out entirely when the field is blank", () => {
-    expect(draftFrom(values)).not.toHaveProperty("token");
-    expect(draftFrom({ ...values, token: " tok " }).token).toBe("tok");
-  });
-
   it("keeps custom wording only when there is some", () => {
     expect(draftFrom(values)).not.toHaveProperty("title");
     expect(draftFrom(values)).not.toHaveProperty("message");
@@ -89,7 +83,7 @@ describe("draftFrom, cooldown", () => {
 
 describe("valuesFrom", () => {
   it("round-trips a draft back through the controls", () => {
-    const draft = draftFrom({ ...values, token: "tok" });
+    const draft = draftFrom(values);
     expect(draftFrom(valuesFrom(draft))).toEqual(draft);
   });
 

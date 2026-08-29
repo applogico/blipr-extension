@@ -1,7 +1,7 @@
 // Everything the extension remembers, on this machine only. `local` holds the
 // watches and the defaults a new one starts from; `session` holds what a picker
-// run leaves behind for a popup that has already closed. Never `sync`: a token
-// stays on the device it was typed into.
+// run leaves behind for a popup that has already closed. Never `sync`: what
+// you set up stays on the device you set it up on.
 import browser from "webextension-polyfill";
 
 import type { SelectorPick } from "./core/selector.js";
@@ -10,7 +10,7 @@ import type { Watch, WatchDraft } from "./core/watch.js";
 export const WATCHES = "watches";
 const DEFAULTS = "defaults";
 
-export type WatchDefaults = Partial<Pick<Watch, "topic" | "server" | "token" | "priority">>;
+export type WatchDefaults = Partial<Pick<Watch, "topic" | "server" | "priority">>;
 
 /** A patch may clear `lastError`, which a plain `Partial<Watch>` cannot say. */
 export type WatchPatch = Partial<Omit<Watch, "lastError">> & { lastError?: string | undefined };
@@ -61,8 +61,8 @@ export async function getDefaults(): Promise<WatchDefaults> {
 }
 
 export async function rememberDefaults(draft: WatchDraft): Promise<void> {
-  const { topic, server, token, priority } = draft;
-  await browser.storage.local.set({ [DEFAULTS]: { topic, server, token, priority } });
+  const { topic, server, priority } = draft;
+  await browser.storage.local.set({ [DEFAULTS]: { topic, server, priority } });
 }
 
 export async function stashPick(tabId: number, pick: SelectorPick): Promise<void> {

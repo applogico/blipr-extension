@@ -8,7 +8,6 @@ export type Watch = {
   condition: Condition;
   topic: string;
   server: string;
-  token?: string;
   priority: number;
   /** Disable itself after firing once. */
   once: boolean;
