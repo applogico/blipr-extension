@@ -85,7 +85,11 @@ async function run(action: string, id: string): Promise<void> {
     case "delete":
       return confirmDelete(watch);
     case "toggle":
-      await patchWatch(id, { enabled: !watch.enabled });
+      // Switching one back on starts it watching from here, not from what is already on the page.
+      await patchWatch(
+        id,
+        watch.enabled ? { enabled: false } : { enabled: true, watchingSince: Date.now() },
+      );
   }
 }
 

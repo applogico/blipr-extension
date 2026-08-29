@@ -1,4 +1,5 @@
-import type { Watch, WatchDraft } from "./watch.js";
+import type { Blip } from "./message.js";
+import type { WatchDraft } from "./watch.js";
 
 export type PublishOutcome = { ok: true } | { ok: false; retryable: boolean; message: string };
 
@@ -8,22 +9,14 @@ export function publishUrl(server: string, topic: string): string {
   return `${server.replace(/\/+$/, "")}/api/notify/${path}`;
 }
 
-export type Blip = { title: string; message: string };
-
-export function messageFor(watch: Pick<Watch, "selector" | "condition">): Blip {
-  return watch.condition === "appears"
-    ? { title: "It showed up", message: `${watch.selector} appeared on the page.` }
-    : { title: "It's gone", message: `${watch.selector} is no longer on the page.` };
-}
-
 /**
  * One publish attempt. Every refusal is final — retrying a missing topic or a
  * bad token just burns requests — so only transport-level trouble is retryable.
  */
 export async function publish(
   draft: WatchDraft,
+  blip: Blip,
   fetchImpl: typeof fetch = fetch,
-  blip: Blip = messageFor(draft),
 ): Promise<PublishOutcome> {
   const body = { ...blip, priority: draft.priority };
   const headers: Record<string, string> = { "Content-Type": "application/json" };

@@ -4,21 +4,25 @@
 import browser from "webextension-polyfill";
 
 import type { EdgeState } from "../core/edges.js";
-import { GRACE_MS, initialState, step } from "../core/edges.js";
+import { GRACE_MS, createdState, initialState, step } from "../core/edges.js";
 import { tryCount } from "../core/selector.js";
 import type { Watch } from "../core/watch.js";
 import { onMessage, send } from "../messages.js";
 import { arm } from "./picker.js";
 
-type LiveWatch = Pick<Watch, "id" | "selector" | "condition">;
+type LiveWatch = Pick<Watch, "id" | "selector" | "condition" | "watchingSince">;
 
 const POLL_MS = 5_000;
 const DEBOUNCE_MS = 250;
 
 const states = new Map<string, EdgeState>();
 const broken = new Set<string>();
+/** What the background last said about each watch, to spot the ones that changed. */
+let described = new Map<string, string>();
 
 let startedAt = Date.now();
+/** When the page itself was opened, which can be long before this script was injected into it. */
+let openedAt = performance.timeOrigin || startedAt;
 let watches: LiveWatch[] = [];
 let signature = "";
 let url = location.href;
@@ -54,11 +58,21 @@ async function refresh(): Promise<void> {
   if (nextSignature === signature) return;
   signature = nextSignature;
   watches = next;
-  states.clear();
-  broken.clear();
+  reconcile(next);
   if (watches.length > 0) observe();
   else stop();
   check();
+}
+
+/** A watch that changed starts over; the rest keep what this page has already seen. */
+function reconcile(next: LiveWatch[]): void {
+  const fresh = new Map(next.map((watch) => [watch.id, JSON.stringify(watch)]));
+  for (const [id, description] of described) {
+    if (fresh.get(id) === description) continue;
+    states.delete(id);
+    broken.delete(id);
+  }
+  described = fresh;
 }
 
 function check(): void {
@@ -67,7 +81,10 @@ function check(): void {
   if (location.href !== url) {
     url = location.href;
     startedAt = Date.now();
+    openedAt = startedAt;
     signature = "";
+    states.clear();
+    broken.clear();
     void refresh();
     return;
   }
@@ -84,14 +101,26 @@ function inspect(watch: LiveWatch): void {
     quietly(send({ kind: "watchError", watchId: watch.id, error: counted.error }));
     return;
   }
-  const before = states.get(watch.id) ?? initialState();
+  const before = states.get(watch.id) ?? seedFor(watch, counted.matches);
   const { state, fire } = step(watch.condition, before, {
     matches: counted.matches,
     startedAt,
     now: Date.now(),
   });
   states.set(watch.id, state);
-  if (fire) quietly(send({ kind: "conditionMet", watchId: watch.id, matches: counted.matches }));
+  if (fire) {
+    quietly(send({ kind: "conditionMet", watchId: watch.id, matches: counted.matches, url }));
+  }
+}
+
+/**
+ * A watch saved while this page was already open must not blip for what was on
+ * screen then. Measured against the page, not against this script: saving the
+ * first watch for a site is what injects the script in the first place.
+ */
+function seedFor(watch: LiveWatch, matches: number): EdgeState {
+  const since = watch.watchingSince ?? 0;
+  return since > openedAt ? createdState(watch.condition, matches) : initialState();
 }
 
 function observe(): void {

@@ -39,8 +39,8 @@
             <button type="button" id="check" class="secondary">Check selector</button>
           </div>
           <p class="hint">
-            Picking closes this popup while you click the page. Open Blipr again and the selector is
-            waiting.
+            Picking asks for access to this site, then closes this popup while you click the page.
+            Open Blipr again and the selector is waiting.
           </p>
           <div id="picked" class="row chips" hidden></div>
           <p id="check-result" class="result" hidden></p>
@@ -106,6 +106,23 @@
           </p>
 
           <details>
+            <summary>Custom title and message</summary>
+            <label>
+              Title <span class="optional">optional</span>
+              <input name="title" type="text" placeholder="It showed up" />
+            </label>
+            <label>
+              Message <span class="optional">optional</span>
+              <input name="message" type="text" placeholder="{selector} appeared on the page." />
+              <small>
+                Leave both empty for Blipr's own wording. <code>{selector}</code>,
+                <code>{matches}</code> and <code>{url}</code> are filled in when the blip is sent.
+                Anything else is sent exactly as you typed it.
+              </small>
+            </label>
+          </details>
+
+          <details>
             <summary>Server and token</summary>
             <label>
               Server
@@ -122,7 +139,8 @@
 
           <button type="submit" class="wide">Save watch</button>
           <p class="hint">
-            Saving asks for access to this site. Blipr only watches the sites you allow.
+            Blipr only watches the sites you allow. Saving asks for access to this one if you have
+            not picked from it.
           </p>
           <p id="result" class="result" hidden></p>
         </form>
@@ -135,6 +153,7 @@
 
       <section id="picking" hidden>
         <p><strong>Click the element you want.</strong></p>
+        <p id="pick-result" class="result" hidden></p>
         <p class="hint">
           Hovering outlines what you are about to pick. Escape cancels. When you have picked, open
           Blipr again: the selector will be waiting, with a count of what it matches.

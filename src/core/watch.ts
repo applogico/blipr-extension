@@ -13,10 +13,18 @@ export type Watch = {
   /** Disable itself after firing once. */
   once: boolean;
   enabled: boolean;
+  /** Wording of its own, in place of Blipr's. Both may use `{selector}`, `{matches}` and `{url}`. */
+  title?: string;
+  message?: string;
   /** Reload the watched tab on a timer, so a hidden tab keeps producing a fresh page. */
   refresh?: boolean;
   /** How often to reload. Kept when refreshing is switched off, so it can be switched back on. */
   refreshMinutes?: number;
+  /**
+   * When this watch started watching. A page that was already open then starts
+   * armed, so a watch never blips for what was on screen before it existed.
+   */
+  watchingSince?: number;
   lastFiredAt?: number;
   lastRefreshedAt?: number;
   lastError?: string;
@@ -24,7 +32,7 @@ export type Watch = {
 
 export type WatchDraft = Omit<
   Watch,
-  "id" | "enabled" | "lastFiredAt" | "lastRefreshedAt" | "lastError"
+  "id" | "enabled" | "watchingSince" | "lastFiredAt" | "lastRefreshedAt" | "lastError"
 > & {
   id?: string;
 };
@@ -35,31 +43,37 @@ export const DEFAULT_PRIORITY = 3;
 export const MIN_REFRESH_MINUTES = 1;
 export const MAX_REFRESH_MINUTES = 1440;
 
+type Rule = { passes: (draft: WatchDraft) => boolean; problem: string };
+
+/** Independent checks, in the order the form should complain about them. */
+const RULES: Rule[] = [
+  { passes: (draft) => draft.urlPattern.trim() !== "", problem: "Add a URL pattern." },
+  { passes: (draft) => draft.selector.trim() !== "", problem: "Add a CSS selector." },
+  { passes: (draft) => draft.topic.trim() !== "", problem: "Add a topic." },
+  { passes: (draft) => isHttpUrl(draft.server), problem: "The server must be an http(s) URL." },
+  {
+    passes: (draft) => isWhole(draft.priority, 1, 5),
+    problem: "Priority must be a whole number from 1 to 5.",
+  },
+  {
+    passes: (draft) => !draft.refresh || draft.refreshMinutes !== undefined,
+    problem: "Say how often to refresh the page, in minutes.",
+  },
+  {
+    passes: (draft) =>
+      draft.refreshMinutes === undefined ||
+      isWhole(draft.refreshMinutes, MIN_REFRESH_MINUTES, MAX_REFRESH_MINUTES),
+    problem: `Refresh must be a whole number of minutes from ${MIN_REFRESH_MINUTES} to ${MAX_REFRESH_MINUTES}.`,
+  },
+];
+
 /** Every problem with `draft`, so the form can show them all at once. */
 export function validate(draft: WatchDraft): string[] {
-  const problems: string[] = [];
-  if (!draft.urlPattern.trim()) problems.push("Add a URL pattern.");
-  if (!draft.selector.trim()) problems.push("Add a CSS selector.");
-  if (!draft.topic.trim()) problems.push("Add a topic.");
-  if (!isHttpUrl(draft.server)) problems.push("The server must be an http(s) URL.");
-  if (!Number.isInteger(draft.priority) || draft.priority < 1 || draft.priority > 5) {
-    problems.push("Priority must be a whole number from 1 to 5.");
-  }
-  if (draft.refresh && draft.refreshMinutes === undefined) {
-    problems.push("Say how often to refresh the page, in minutes.");
-  }
-  if (draft.refreshMinutes !== undefined && !isInterval(draft.refreshMinutes)) {
-    problems.push(
-      `Refresh must be a whole number of minutes from ${MIN_REFRESH_MINUTES} to ${MAX_REFRESH_MINUTES}.`,
-    );
-  }
-  return problems;
+  return RULES.filter((rule) => !rule.passes(draft)).map((rule) => rule.problem);
 }
 
-function isInterval(minutes: number): boolean {
-  return (
-    Number.isInteger(minutes) && minutes >= MIN_REFRESH_MINUTES && minutes <= MAX_REFRESH_MINUTES
-  );
+function isWhole(value: number, least: number, most: number): boolean {
+  return Number.isInteger(value) && value >= least && value <= most;
 }
 
 function isHttpUrl(value: string): boolean {

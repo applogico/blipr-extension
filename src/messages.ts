@@ -10,7 +10,7 @@ export type Message =
   /** Content script asks which watches apply to the page it is running on. */
   | { kind: "watchesForUrl"; url: string }
   /** Content script reports a matched set becoming non-empty or empty. */
-  | { kind: "conditionMet"; watchId: string; matches: number }
+  | { kind: "conditionMet"; watchId: string; matches: number; url: string }
   /** Content script gives up on a selector that will never parse. */
   | { kind: "watchError"; watchId: string; error: string }
   /** Popup arms the picker on a tab; the popup closes on the next page click. */
@@ -27,7 +27,7 @@ export type Message =
   | { kind: "testWatch"; draft: WatchDraft };
 
 export type Responses = {
-  watchesForUrl: Array<Pick<Watch, "id" | "selector" | "condition">>;
+  watchesForUrl: Array<Pick<Watch, "id" | "selector" | "condition" | "watchingSince">>;
   conditionMet: void;
   watchError: void;
   armPicker: void;

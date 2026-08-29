@@ -14,6 +14,17 @@ export function initialState(): EdgeState {
   return { seenMatch: false, armed: false };
 }
 
+/**
+ * The state a watch starts in on a page that was already open when the watch
+ * was saved. Whatever the condition says at that moment is what the user was
+ * looking at when they created it, and a watch never fires for that: it starts
+ * armed, so only a change from here on fires. A page a human just picked an
+ * element on is settled, so "gone" does not wait out the grace period either.
+ */
+export function createdState(condition: Condition, matches: number): EdgeState {
+  return { seenMatch: true, armed: holds(condition, matches, true) };
+}
+
 export type Observation = {
   matches: number;
   /** When the content script started watching this page. */
@@ -35,13 +46,12 @@ export function step(
   { matches, startedAt, now }: Observation,
 ): { state: EdgeState; fire: boolean } {
   const seenMatch = state.seenMatch || matches > 0;
-  const holds =
-    condition === "appears"
-      ? matches > 0
-      : matches === 0 && (seenMatch || now - startedAt >= GRACE_MS);
+  const settled = seenMatch || now - startedAt >= GRACE_MS;
+  const armed = holds(condition, matches, settled);
 
-  return {
-    state: { seenMatch, armed: holds },
-    fire: holds && !state.armed,
-  };
+  return { state: { seenMatch, armed }, fire: armed && !state.armed };
+}
+
+function holds(condition: Condition, matches: number, settled: boolean): boolean {
+  return condition === "appears" ? matches > 0 : matches === 0 && settled;
 }

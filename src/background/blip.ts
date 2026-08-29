@@ -2,7 +2,9 @@
 // stops the worker about thirty seconds after the last handler settles, so a
 // cooldown is a stored timestamp and the retry happens while the handler waits.
 import { RETRY_DELAY_MS, inCooldown, shouldRetry } from "../core/cooldown.js";
-import type { Blip, PublishOutcome } from "../core/publish.js";
+import type { Blip, Occasion } from "../core/message.js";
+import { messageFor } from "../core/message.js";
+import type { PublishOutcome } from "../core/publish.js";
 import { publish } from "../core/publish.js";
 import type { Watch, WatchDraft } from "../core/watch.js";
 import type { WatchPatch } from "../storage.js";
@@ -13,20 +15,20 @@ export const TEST_BLIP: Blip = {
   message: "Test blip. This watch can reach your topic.",
 };
 
-export async function attempt(draft: WatchDraft, blip?: Blip): Promise<PublishOutcome> {
+export async function attempt(draft: WatchDraft, blip: Blip): Promise<PublishOutcome> {
   for (let tries = 1; ; tries += 1) {
-    const outcome = blip ? await publish(draft, fetch, blip) : await publish(draft);
+    const outcome = await publish(draft, blip);
     if (outcome.ok || !shouldRetry(tries, outcome.retryable)) return outcome;
     await delay(RETRY_DELAY_MS);
   }
 }
 
-export async function fire(watch: Watch): Promise<void> {
+export async function fire(watch: Watch, occasion: Occasion): Promise<void> {
   const now = Date.now();
   if (!watch.enabled || inCooldown(watch.lastFiredAt, now)) return;
   // Claim the slot before publishing, so two tabs cannot both send the same blip.
   await patchWatch(watch.id, { lastFiredAt: now });
-  await patchWatch(watch.id, recordOf(watch, await attempt(watch)));
+  await patchWatch(watch.id, recordOf(watch, await attempt(watch, messageFor(watch, occasion))));
 }
 
 function recordOf(watch: Watch, outcome: PublishOutcome): WatchPatch {

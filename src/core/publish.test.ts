@@ -13,6 +13,8 @@ const draft = {
   once: false,
 };
 
+const blip = { title: "It's gone", message: ".spinner is no longer on the page." };
+
 const responding = (status: number) =>
   vi.fn(() => Promise.resolve(new Response(null, { status }))) as unknown as typeof fetch;
 
@@ -31,18 +33,18 @@ describe("publishUrl", () => {
 describe("publish", () => {
   it("sends the token only when there is one", async () => {
     const fetchImpl = responding(200);
-    await publish(draft, fetchImpl);
+    await publish(draft, blip, fetchImpl);
     const [, init] = vi.mocked(fetchImpl).mock.calls[0]!;
     expect((init?.headers as Record<string, string>).Authorization).toBeUndefined();
 
-    await publish({ ...draft, token: " tok " }, fetchImpl);
+    await publish({ ...draft, token: " tok " }, blip, fetchImpl);
     const [, withToken] = vi.mocked(fetchImpl).mock.calls[1]!;
     expect((withToken?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
   });
 
-  it("sends the blip it was given instead of the one derived from the watch", async () => {
+  it("sends the blip it is given, with the watch's priority", async () => {
     const fetchImpl = responding(200);
-    await publish(draft, fetchImpl, { title: "Blipr", message: "Test blip." });
+    await publish(draft, { title: "Blipr", message: "Test blip." }, fetchImpl);
     const [, init] = vi.mocked(fetchImpl).mock.calls[0]!;
     expect(JSON.parse(init?.body as string)).toEqual({
       title: "Blipr",
@@ -52,7 +54,7 @@ describe("publish", () => {
   });
 
   it("never retries a refusal, and says what to do about a missing topic", async () => {
-    const result = await publish(draft, responding(404));
+    const result = await publish(draft, blip, responding(404));
     expect(result).toEqual({
       ok: false,
       retryable: false,
@@ -61,13 +63,13 @@ describe("publish", () => {
   });
 
   it("retries only transport trouble", async () => {
-    expect(await publish(draft, responding(500))).toMatchObject({ retryable: true });
-    expect(await publish(draft, responding(429))).toMatchObject({ retryable: true });
-    expect(await publish(draft, responding(400))).toMatchObject({ retryable: false });
+    expect(await publish(draft, blip, responding(500))).toMatchObject({ retryable: true });
+    expect(await publish(draft, blip, responding(429))).toMatchObject({ retryable: true });
+    expect(await publish(draft, blip, responding(400))).toMatchObject({ retryable: false });
 
     const offline = vi.fn(() =>
       Promise.reject(new TypeError("network")),
     ) as unknown as typeof fetch;
-    expect(await publish(draft, offline)).toMatchObject({ retryable: true });
+    expect(await publish(draft, blip, offline)).toMatchObject({ retryable: true });
   });
 });

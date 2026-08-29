@@ -11,6 +11,8 @@ const FIELDS = [
   "topic",
   "server",
   "token",
+  "title",
+  "message",
   "priority",
   "repeat",
   "refresh",
@@ -22,8 +24,9 @@ export type FormValues = Record<Field, string>;
 
 export function draftFrom(values: FormValues, id?: string): WatchDraft {
   const token = values.token.trim();
+  const title = values.title.trim();
+  const message = values.message.trim();
   const priority = Number(values.priority.trim());
-  const refreshMinutes = Number(values.refreshMinutes.trim());
   return {
     urlPattern: values.urlPattern.trim(),
     selector: values.selector.trim(),
@@ -32,10 +35,20 @@ export function draftFrom(values: FormValues, id?: string): WatchDraft {
     server: values.server.trim() || DEFAULT_SERVER,
     priority: Number.isInteger(priority) && priority > 0 ? priority : DEFAULT_PRIORITY,
     once: values.repeat === "once",
-    ...(values.refresh === "on" ? { refresh: true } : {}),
-    ...(values.refreshMinutes.trim() ? { refreshMinutes } : {}),
+    ...refreshFrom(values),
     ...(token ? { token } : {}),
+    ...(title ? { title } : {}),
+    ...(message ? { message } : {}),
     ...(id ? { id } : {}),
+  };
+}
+
+/** A blank interval is no interval at all, rather than a zero. */
+function refreshFrom(values: FormValues): Pick<WatchDraft, "refresh" | "refreshMinutes"> {
+  const minutes = values.refreshMinutes.trim();
+  return {
+    ...(values.refresh === "on" ? { refresh: true } : {}),
+    ...(minutes ? { refreshMinutes: Number(minutes) } : {}),
   };
 }
 
@@ -47,6 +60,8 @@ export function valuesFrom(draft: WatchDraft): FormValues {
     topic: draft.topic,
     server: draft.server,
     token: draft.token ?? "",
+    title: draft.title ?? "",
+    message: draft.message ?? "",
     priority: String(draft.priority),
     repeat: draft.once ? "once" : "every",
     refresh: draft.refresh ? "on" : "off",
@@ -81,6 +96,8 @@ export function toDraft(watch: Watch): WatchDraft {
     ...(watch.refresh ? { refresh: true } : {}),
     ...(watch.refreshMinutes === undefined ? {} : { refreshMinutes: watch.refreshMinutes }),
     ...(watch.token ? { token: watch.token } : {}),
+    ...(watch.title ? { title: watch.title } : {}),
+    ...(watch.message ? { message: watch.message } : {}),
   };
 }
 

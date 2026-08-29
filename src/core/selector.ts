@@ -55,25 +55,31 @@ function nthOfType(el: Element): string {
   return peers.length > 1 ? `${shapeOf(el)}:nth-of-type(${index})` : shapeOf(el);
 }
 
+/** An element's own id selector, when the id is one worth building on. */
+function idSelector(el: Element | null): string | null {
+  const id = el?.getAttribute("id");
+  return id && isStableClass(id) ? `#${escapeIdent(id)}` : null;
+}
+
+/** The candidate on its own if that already matches only `el`, or anchored to an ancestor id. */
+function narrowed(candidate: string, anchor: string | null, root: ParentNode): string | null {
+  if (countMatches(root, candidate) === 1) return candidate;
+  if (!anchor) return null;
+  const anchored = `${anchor} > ${candidate}`;
+  return countMatches(root, anchored) === 1 ? anchored : null;
+}
+
 /** The shortest selector this function can prove matches only `el`. */
 export function uniqueSelector(el: Element, root: ParentNode = el.ownerDocument): string {
-  const id = el.getAttribute("id");
-  if (id && isStableClass(id) && countMatches(root, `#${escapeIdent(id)}`) === 1) {
-    return `#${escapeIdent(id)}`;
-  }
+  const own = idSelector(el);
+  if (own && countMatches(root, own) === 1) return own;
 
   const parts: string[] = [];
   let current: Element | null = el;
   for (let depth = 0; current && depth < MAX_DEPTH; depth += 1) {
     parts.unshift(nthOfType(current));
-    const candidate = parts.join(" > ");
-    if (countMatches(root, candidate) === 1) return candidate;
-
-    const ancestorId = current.parentElement?.getAttribute("id");
-    if (ancestorId && isStableClass(ancestorId)) {
-      const anchored = `#${escapeIdent(ancestorId)} > ${candidate}`;
-      if (countMatches(root, anchored) === 1) return anchored;
-    }
+    const found = narrowed(parts.join(" > "), idSelector(current.parentElement), root);
+    if (found) return found;
     current = current.parentElement;
   }
   return parts.join(" > ");

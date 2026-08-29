@@ -71,6 +71,24 @@
             <small>Needed for a protected topic. Stored on this device only, never synced.</small>
           </label>
 
+          <details>
+            <summary>Custom title and message</summary>
+            <label>
+              Title <span class="optional">optional</span>
+              <input name="title" type="text" placeholder="It showed up" />
+            </label>
+            <label>
+              Message <span class="optional">optional</span>
+              <input name="message" type="text" placeholder="{selector} appeared on the page." />
+              <small>
+                Leave both empty for Blipr's own wording. <code>{selector}</code>,
+                <code>{matches}</code> and <code>{url}</code> are filled in when the blip is sent —
+                the watch's selector, how many elements it matched, and the page it was on. Anything
+                else in braces is sent exactly as you typed it.
+              </small>
+            </label>
+          </details>
+
           <div class="row">
             <label>
               Priority

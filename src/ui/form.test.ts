@@ -10,6 +10,8 @@ const values = {
   topic: " ci ",
   server: " https://blipr.dev ",
   token: "  ",
+  title: "  ",
+  message: "",
   priority: "5",
   repeat: "every",
   refresh: "off",
@@ -49,6 +51,14 @@ describe("draftFrom", () => {
   it("leaves the token out entirely when the field is blank", () => {
     expect(draftFrom(values)).not.toHaveProperty("token");
     expect(draftFrom({ ...values, token: " tok " }).token).toBe("tok");
+  });
+
+  it("keeps custom wording only when there is some", () => {
+    expect(draftFrom(values)).not.toHaveProperty("title");
+    expect(draftFrom(values)).not.toHaveProperty("message");
+    const worded = draftFrom({ ...values, title: " Build done ", message: "{matches} left" });
+    expect(worded.title).toBe("Build done");
+    expect(worded.message).toBe("{matches} left");
   });
 
   it("falls back rather than saving an empty server or a priority of NaN", () => {

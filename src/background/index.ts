@@ -33,14 +33,12 @@ const VAGUE_PATTERN =
 onMessage({
   watchesForUrl: async ({ url }) => {
     const watches = await getWatches();
-    return watches
-      .filter((watch) => watch.enabled && matchesUrl(watch.urlPattern, url))
-      .map(({ id, selector, condition }) => ({ id, selector, condition }));
+    return watches.filter((watch) => watch.enabled && matchesUrl(watch.urlPattern, url)).map(live);
   },
 
-  conditionMet: async ({ watchId }) => {
+  conditionMet: async ({ watchId, matches, url }) => {
     const watch = await getWatch(watchId);
-    if (watch) await fire(watch);
+    if (watch) await fire(watch, { matches, url });
   },
 
   watchError: async ({ watchId, error }) => {
@@ -107,20 +105,37 @@ async function save(draft: WatchDraft): Promise<Responses["saveWatch"]> {
     return { error: `Blipr has no access to ${hostOf(origin)}, so that watch could never run.` };
   }
 
-  const { id, ...fields } = draft;
-  const existing = id ? await getWatch(id) : null;
-  // Saving is a fix, so the stale error and the cooldown a failed publish left go with it.
-  const watch: Watch = {
-    ...fields,
-    id: id ?? crypto.randomUUID(),
-    enabled: existing?.enabled ?? true,
-    // The refresh clock starts at the save, so the first reload is a whole interval away.
-    ...(fields.refresh ? { lastRefreshedAt: Date.now() } : {}),
-  };
-
+  const watch = await settled(draft);
   await putWatch(watch);
   await rememberDefaults(draft);
   await syncContentScripts();
   await injectInto(origin);
   return { saved: watch };
+}
+
+/** Saving is a fix, so the stale error and the cooldown a failed publish left go with it. */
+async function settled(draft: WatchDraft): Promise<Watch> {
+  const { id, ...fields } = draft;
+  const existing = id ? await getWatch(id) : null;
+  const now = Date.now();
+  return {
+    ...fields,
+    id: id ?? crypto.randomUUID(),
+    enabled: existing?.enabled ?? true,
+    // It watches from here on, so it never blips for what was already on the page.
+    watchingSince: now,
+    // The refresh clock starts at the save too, so the first reload is a whole interval away.
+    ...(fields.refresh ? { lastRefreshedAt: now } : {}),
+  };
+}
+
+/** All a content script is ever told about a watch: no topic, no server, no token. */
+function live(watch: Watch): Responses["watchesForUrl"][number] {
+  const { id, selector, condition, watchingSince } = watch;
+  return {
+    id,
+    selector,
+    condition,
+    ...(watchingSince === undefined ? {} : { watchingSince }),
+  };
 }

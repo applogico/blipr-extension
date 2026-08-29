@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GRACE_MS, initialState, step } from "./edges.js";
+import { GRACE_MS, createdState, initialState, step } from "./edges.js";
 
 const at = (ms: number) => ({ startedAt: 0, now: ms });
 
@@ -58,5 +58,31 @@ describe("gone", () => {
     const { state, fire } = step("gone", initialState(), blank);
     expect(fire).toBe(false);
     expect(step("gone", state, { ...blank, now: reloadedAt + GRACE_MS }).fire).toBe(true);
+  });
+});
+
+describe("a watch created on a page that is already open", () => {
+  it("does not blip for the elements that were already there", () => {
+    const { state, fire } = step("appears", createdState("appears", 3), { matches: 3, ...at(10) });
+    expect(fire).toBe(false);
+
+    const gone = step("appears", state, { matches: 0, ...at(20) });
+    expect(step("appears", gone.state, { matches: 1, ...at(30) }).fire).toBe(true);
+  });
+
+  it("does not blip for a page that already matched nothing, grace period or not", () => {
+    let { state, fire } = step("gone", createdState("gone", 0), { matches: 0, ...at(10) });
+    expect(fire).toBe(false);
+
+    ({ state, fire } = step("gone", state, { matches: 0, ...at(GRACE_MS + 10) }));
+    expect(fire).toBe(false);
+
+    ({ state } = step("gone", state, { matches: 2, ...at(GRACE_MS + 20) }));
+    expect(step("gone", state, { matches: 0, ...at(GRACE_MS + 30) }).fire).toBe(true);
+  });
+
+  it("still blips for the transition it was created to wait for", () => {
+    expect(step("appears", createdState("appears", 0), { matches: 1, ...at(10) }).fire).toBe(true);
+    expect(step("gone", createdState("gone", 4), { matches: 0, ...at(10) }).fire).toBe(true);
   });
 });

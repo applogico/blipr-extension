@@ -29,6 +29,7 @@ const chips = need<HTMLElement>("#picked");
 const errors = need<HTMLElement>("#form-errors");
 const result = need<HTMLElement>("#result");
 const checkResult = need<HTMLElement>("#check-result");
+const pickResult = need<HTMLElement>("#pick-result");
 const current = need<HTMLElement>("#current");
 const list = need<HTMLElement>("#watches");
 
@@ -47,7 +48,9 @@ async function main(): Promise<void> {
   page = tab;
   await restore();
   form.addEventListener("submit", onSubmit);
-  need("#pick").addEventListener("click", () => void onPick());
+  // Parked on every committed edit, so the form survives the popup closing under a prompt.
+  form.addEventListener("change", () => void stashDraft(page.id, currentDraft()));
+  need("#pick").addEventListener("click", onPick);
   need("#check").addEventListener("click", () => void onCheck());
   need("#site").addEventListener("click", widen);
   list.addEventListener("click", (event) => void onRowAction(event));
@@ -94,16 +97,37 @@ async function save(draft: WatchDraft): Promise<void> {
   await refresh();
 }
 
-async function onPick(): Promise<void> {
-  await stashDraft(page.id, currentDraft());
-  try {
-    await send({ kind: "armPicker", tabId: page.id });
-  } catch {
+/**
+ * Picking is where access is asked for. Both engines only allow a permission
+ * prompt from a user gesture, and on Chrome that prompt closes the popup —
+ * which picking does anyway, so the two interruptions collapse into one and
+ * saving afterwards needs no prompt at all.
+ */
+function onPick(): void {
+  const draft = currentDraft();
+  // Nothing is awaited first: an await would spend the gesture the prompt needs,
+  // and nothing after it runs once Chrome has closed this popup.
+  void stashDraft(page.id, draft);
+  void pick(draft);
+}
+
+async function pick(draft: WatchDraft): Promise<void> {
+  const [access, armed] = await Promise.all([requestAccess(draft.urlPattern), armPicker()]);
+  if (!armed) {
     show(result, UNREACHABLE, "bad");
     return;
   }
   panel.hidden = true;
   picking.hidden = false;
+  if ("error" in access) show(pickResult, access.error, "bad");
+}
+
+/** The picker runs on the active tab either way; access is what the watch needs later. */
+function armPicker(): Promise<boolean> {
+  return send({ kind: "armPicker", tabId: page.id }).then(
+    () => true,
+    () => false,
+  );
 }
 
 async function onCheck(): Promise<void> {
