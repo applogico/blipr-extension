@@ -3,6 +3,7 @@
 // for host access, which only a user gesture is allowed to do.
 import browser from "webextension-polyfill";
 
+import { onceAtATime } from "../core/guard.js";
 import type { SelectorPick } from "../core/selector.js";
 import { matchesUrl, suggestPattern } from "../core/urlmatch.js";
 import type { WatchDraft } from "../core/watch.js";
@@ -21,6 +22,7 @@ import { matchLabel, matchPhrase } from "../ui/text.js";
 type Choice = { label: string; selector: string; strict: boolean };
 
 const UNREACHABLE = "Blipr cannot reach this page. Reload it, then try again.";
+const CLOSE_DELAY_MS = 800;
 
 const form = need("#watch-form", HTMLFormElement);
 const panel = need("#panel", HTMLElement);
@@ -32,6 +34,8 @@ const checkResult = need("#check-result", HTMLElement);
 const pickResult = need("#pick-result", HTMLElement);
 const current = need("#current", HTMLElement);
 const list = need("#watches", HTMLElement);
+const saveButton = need("#save", HTMLButtonElement);
+const SAVE_LABEL = saveButton.textContent;
 
 let page: PageTab;
 
@@ -68,8 +72,18 @@ async function restore(): Promise<void> {
   if (pick) await offer(pick);
 }
 
+const saving = onceAtATime(async () => {
+  setSaving(true);
+  try {
+    await save(currentDraft());
+  } finally {
+    setSaving(false);
+  }
+});
+
 function onSubmit(event: Event): void {
   event.preventDefault();
+  if (saving.busy) return;
   const draft = currentDraft();
   const problems = validate(draft);
   listErrors(errors, problems);
@@ -78,7 +92,12 @@ function onSubmit(event: Event): void {
   // parked without awaiting: an await here would spend the gesture that
   // `permissions.request` needs.
   void stashDraft(page.id, draft);
-  void save(draft);
+  void saving.run();
+}
+
+function setSaving(active: boolean): void {
+  saveButton.disabled = active;
+  saveButton.textContent = active ? "Saving…" : SAVE_LABEL;
 }
 
 async function save(draft: WatchDraft): Promise<void> {
@@ -93,8 +112,22 @@ async function save(draft: WatchDraft): Promise<void> {
     return;
   }
   await forgetTab(page.id);
+  await reset();
   show(result, "Watch saved. Blipr is watching this page now.", "good");
   await refresh();
+  setTimeout(() => {
+    window.close();
+  }, CLOSE_DELAY_MS);
+}
+
+/** What a fresh open would show: this tab's pattern and the defaults, none of the watch just saved. */
+async function reset(): Promise<void> {
+  listErrors(errors, []);
+  chips.replaceChildren();
+  chips.hidden = true;
+  checkResult.hidden = true;
+  pickResult.hidden = true;
+  fillForm(form, blankDraft(await getDefaults(), suggestPattern(page.url)));
 }
 
 /**

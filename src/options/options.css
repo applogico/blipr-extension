@@ -168,6 +168,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 button.secondary {
   border-color: var(--line);
   background: var(--card);

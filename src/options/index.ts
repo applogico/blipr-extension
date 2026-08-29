@@ -2,6 +2,7 @@
 // the popup it asks for host access itself, because only a user gesture may.
 import browser from "webextension-polyfill";
 
+import { onceAtATime } from "../core/guard.js";
 import type { Watch, WatchDraft } from "../core/watch.js";
 import { validate } from "../core/watch.js";
 import { send } from "../messages.js";
@@ -26,6 +27,8 @@ const list = need("#watches", HTMLElement);
 const errors = need("#form-errors", HTMLElement);
 const heading = need("#form-heading", HTMLElement);
 const result = need("#result", HTMLElement);
+const saveButton = need("#save", HTMLButtonElement);
+const SAVE_LABEL = saveButton.textContent;
 
 let editing: string | null = null;
 
@@ -40,13 +43,27 @@ async function main(): Promise<void> {
   await refresh();
 }
 
+const saving = onceAtATime(async () => {
+  setSaving(true);
+  try {
+    await save(draftFrom(readForm(form), editing ?? undefined));
+  } finally {
+    setSaving(false);
+  }
+});
+
 function onSubmit(event: Event): void {
   event.preventDefault();
-  const draft = draftFrom(readForm(form), editing ?? undefined);
-  const problems = validate(draft);
+  if (saving.busy) return;
+  const problems = validate(draftFrom(readForm(form), editing ?? undefined));
   listErrors(errors, problems);
   // The gesture must reach `permissions.request`, so nothing is awaited before save().
-  if (problems.length === 0) void save(draft);
+  if (problems.length === 0) void saving.run();
+}
+
+function setSaving(active: boolean): void {
+  saveButton.disabled = active;
+  saveButton.textContent = active ? "Saving…" : SAVE_LABEL;
 }
 
 async function save(draft: WatchDraft): Promise<void> {
