@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blipr</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Blipr</h1>
+      <p class="lede">
+        Watch a page for an element and get a blip on your phone the moment it shows up, or the
+        moment the last one goes away.
+      </p>
+      <p class="callout">
+        Create the topic in the Blipr app first. Publishing to a topic that does not exist yet is
+        refused by the server.
+      </p>
+
+      <section>
+        <h2>Watches</h2>
+        <div id="watches"></div>
+        <p id="result" class="result" hidden></p>
+      </section>
+
+      <section>
+        <h2 id="form-heading">Add a watch</h2>
+        <form id="watch-form">
+          <label>
+            URL pattern
+            <input name="urlPattern" type="text" placeholder="https://example.com/tickets*" />
+            <small>
+              Matched against the whole URL. <code>*</code> is the only wildcard. Saving asks for
+              access to that site, and Blipr only watches the sites you allow.
+            </small>
+          </label>
+
+          <label>
+            CSS selector
+            <input name="selector" type="text" placeholder=".ticket-row .buy-button" />
+          </label>
+
+          <label>
+            Blip when the element
+            <select name="condition">
+              <option value="appears">appears</option>
+              <option value="gone">is gone</option>
+            </select>
+            <small>
+              <strong>Appears</strong> fires as soon as the selector matches at least one element,
+              including if it already matches when the page loads. <strong>Is gone</strong> means
+              the selector matches nothing at all: either it matched earlier on this page and every
+              match went away, or it never matched and the page has been settled for 5 seconds. That
+              grace period keeps a half-rendered page from firing instantly.
+            </small>
+          </label>
+
+          <label>
+            Topic
+            <input name="topic" type="text" placeholder="tickets or @yourhandle/tickets" />
+          </label>
+
+          <label>
+            Server
+            <input name="server" type="url" placeholder="https://blipr.dev" />
+          </label>
+
+          <label>
+            Token <span class="optional">optional</span>
+            <input name="token" type="password" autocomplete="off" placeholder="blipr_pk_..." />
+            <small>Needed for a protected topic. Stored on this device only, never synced.</small>
+          </label>
+
+          <div class="row">
+            <label>
+              Priority
+              <select name="priority">
+                <option value="1">1 &middot; min</option>
+                <option value="2">2 &middot; low</option>
+                <option value="3">3 &middot; default</option>
+                <option value="4">4 &middot; high</option>
+                <option value="5">5 &middot; time-sensitive</option>
+              </select>
+            </label>
+
+            <label>
+              Fire
+              <select name="repeat">
+                <option value="once">once, then stop</option>
+                <option value="every">every time</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Refresh the page
+              <select name="refresh">
+                <option value="off">off</option>
+                <option value="on">on</option>
+              </select>
+            </label>
+
+            <label>
+              Every <span class="optional">minutes</span>
+              <input
+                name="refreshMinutes"
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                placeholder="15"
+              />
+            </label>
+          </div>
+          <p class="hint">
+            A tab you are not looking at is throttled, and many sites stop updating themselves while
+            hidden. Reloading the page on a timer gives the watch a fresh page anyway. Reloading
+            also discards anything unsaved on that page, and Blipr never reloads the tab you are
+            looking at. Once an interval is set you can start and stop the reloads from the watch
+            itself.
+          </p>
+
+          <ul id="form-errors" class="errors" hidden></ul>
+
+          <div class="row">
+            <button type="submit">Save watch</button>
+            <button type="button" id="cancel" class="secondary">Clear</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="index.js"></script>
+  </body>
+</html>
