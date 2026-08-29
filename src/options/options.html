@@ -112,12 +112,11 @@
             <label>
               Cooldown <span class="optional">seconds</span>
               <input name="cooldownSeconds" type="number" min="0" max="3600" step="1" />
-              <small>
-                The shortest gap between two blips from this watch, so a page that flickers cannot
-                blip twice for one change. Set it to 0 to blip on every change.
-              </small>
             </label>
           </div>
+          <p class="hint">
+            Cooldown is the shortest gap between two blips. 0 blips on every change.
+          </p>
 
           <div class="row">
             <label>
@@ -141,11 +140,8 @@
             </label>
           </div>
           <p class="hint">
-            A tab you are not looking at is throttled, and many sites stop updating themselves while
-            hidden. Reloading the page on a timer gives the watch a fresh page anyway. Reloading
-            also discards anything unsaved on that page, and Blipr never reloads the tab you are
-            looking at. Once an interval is set you can start and stop the reloads from the watch
-            itself.
+            Reloading discards anything unsaved on the page, and Blipr never reloads the tab you are
+            looking at.
           </p>
 
           <ul id="form-errors" class="errors" hidden></ul>

@@ -50,15 +50,15 @@
             <input name="topic" type="text" placeholder="tickets or @yourhandle/tickets" />
           </label>
 
-          <div class="row">
-            <label>
-              Element
-              <select name="condition">
-                <option value="appears">appears</option>
-                <option value="gone">is gone</option>
-              </select>
-            </label>
+          <label>
+            Element
+            <select name="condition">
+              <option value="appears">appears</option>
+              <option value="gone">is gone</option>
+            </select>
+          </label>
 
+          <div class="row">
             <label>
               Priority
               <select name="priority">
@@ -79,12 +79,12 @@
             </label>
 
             <label>
-              Cooldown <span class="optional">seconds</span>
+              Cooldown
               <input name="cooldownSeconds" type="number" min="0" max="3600" step="1" />
             </label>
           </div>
           <p class="hint">
-            Cooldown is the shortest gap between two blips from this watch. 0 blips on every change.
+            Cooldown is the shortest gap between two blips, in seconds. 0 blips on every change.
           </p>
 
           <div class="row">
@@ -109,8 +109,8 @@
             </label>
           </div>
           <p class="hint">
-            Reloading keeps a background tab producing a fresh page, at the cost of anything unsaved
-            on it. Blipr never reloads the tab you are looking at.
+            Reloading discards anything unsaved on the page, and Blipr never reloads the tab you are
+            looking at.
           </p>
 
           <details>
