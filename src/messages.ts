@@ -28,10 +28,10 @@ export type Message =
 
 export type Responses = {
   watchesForUrl: Array<Pick<Watch, "id" | "selector" | "condition" | "watchingSince">>;
-  conditionMet: void;
-  watchError: void;
-  armPicker: void;
-  pickResult: void;
+  conditionMet: undefined;
+  watchError: undefined;
+  armPicker: undefined;
+  pickResult: undefined;
   takePick: SelectorPick | null;
   countMatches: { matches: number } | { error: string };
   saveWatch: { saved: Watch } | { error: string };

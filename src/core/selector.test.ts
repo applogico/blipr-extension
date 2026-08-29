@@ -8,6 +8,18 @@ const html = (markup: string) => {
   return document.body;
 };
 
+const q = (selector: string): Element => {
+  const node = document.querySelectorAll(selector)[0];
+  if (!node) throw new Error(`the fixture has no ${selector}`);
+  return node;
+};
+
+const nth = (selector: string, index: number): Element => {
+  const node = document.querySelectorAll(selector)[index];
+  if (!node) throw new Error(`the fixture has no ${selector} at ${index}`);
+  return node;
+};
+
 beforeEach(() => {
   document.body.innerHTML = "";
 });
@@ -15,17 +27,17 @@ beforeEach(() => {
 describe("uniqueSelector", () => {
   it("prefers a unique id", () => {
     html(`<div id="run"><span class="spinner"></span></div>`);
-    expect(uniqueSelector(document.querySelector("#run")!)).toBe("#run");
+    expect(uniqueSelector(q("#run"))).toBe("#run");
   });
 
   it("ignores an id a framework generated", () => {
     html(`<div id="css-1a2b3c4d5e"><b></b></div>`);
-    expect(uniqueSelector(document.querySelector("b")!)).not.toContain("css-1a2b3c4d5e");
+    expect(uniqueSelector(q("b"))).not.toContain("css-1a2b3c4d5e");
   });
 
   it("matches exactly one element", () => {
     html(`<ul><li class="step"></li><li class="step"></li><li class="step"></li></ul>`);
-    const selector = uniqueSelector(document.querySelectorAll("li")[1]!);
+    const selector = uniqueSelector(nth("li", 1));
     expect(document.querySelectorAll(selector)).toHaveLength(1);
     expect(document.querySelector(selector)).toBe(document.querySelectorAll("li")[1]);
   });
@@ -34,26 +46,26 @@ describe("uniqueSelector", () => {
 describe("similarSelector", () => {
   it("generalizes to every peer that shares a class", () => {
     html(`<div><i class="spinner"></i><i class="spinner"></i><i class="spinner"></i></div>`);
-    const selector = similarSelector(document.querySelector("i")!);
+    const selector = similarSelector(q("i"));
     expect(selector).toBe("i.spinner");
-    expect(document.querySelectorAll(selector!)).toHaveLength(3);
+    expect(document.querySelectorAll("i.spinner")).toHaveLength(3);
   });
 
   it("declines when the element stands alone", () => {
     html(`<div><i class="only"></i></div>`);
-    expect(similarSelector(document.querySelector("i")!)).toBeNull();
+    expect(similarSelector(q("i"))).toBeNull();
   });
 
   it("declines a bare tag, which would generalize too far", () => {
     html(`<div><i></i><i></i></div>`);
-    expect(similarSelector(document.querySelector("i")!)).toBeNull();
+    expect(similarSelector(q("i"))).toBeNull();
   });
 });
 
 describe("pick", () => {
   it("offers both, with the count that shows what the user is choosing", () => {
     html(`<div><i class="spinner"></i><i class="spinner"></i></div>`);
-    const result = pick(document.querySelector("i")!);
+    const result = pick(q("i"));
     expect(document.querySelectorAll(result.unique)).toHaveLength(1);
     expect(result.similar).toEqual({ selector: "i.spinner", matches: 2 });
   });
@@ -70,11 +82,11 @@ describe("tryCount", () => {
 describe("shapeOf", () => {
   it("labels an element by what it is, ignoring generated classes", () => {
     html(`<i class="spinner css-1a2b3c4d"></i>`);
-    expect(shapeOf(document.querySelector("i")!)).toBe("i.spinner");
+    expect(shapeOf(q("i"))).toBe("i.spinner");
   });
 
   it("falls back to the bare tag when nothing survives", () => {
     html(`<section></section>`);
-    expect(shapeOf(document.querySelector("section")!)).toBe("section");
+    expect(shapeOf(q("section"))).toBe("section");
   });
 });

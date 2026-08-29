@@ -44,7 +44,10 @@ function alreadyRunning(): boolean {
 function start(): void {
   onMessage({
     armPicker: ({ tabId }) => {
-      arm((pick) => quietly(send({ kind: "pickResult", tabId, pick })));
+      arm((pick) => {
+        quietly(send({ kind: "pickResult", tabId, pick }));
+      });
+      return undefined; // the pick comes back as its own message, not as a reply
     },
     countMatches: ({ selector }) => tryCount(document, selector),
   });

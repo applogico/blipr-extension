@@ -22,27 +22,27 @@ type Choice = { label: string; selector: string; strict: boolean };
 
 const UNREACHABLE = "Blipr cannot reach this page. Reload it, then try again.";
 
-const form = need<HTMLFormElement>("#watch-form");
-const panel = need<HTMLElement>("#panel");
-const picking = need<HTMLElement>("#picking");
-const chips = need<HTMLElement>("#picked");
-const errors = need<HTMLElement>("#form-errors");
-const result = need<HTMLElement>("#result");
-const checkResult = need<HTMLElement>("#check-result");
-const pickResult = need<HTMLElement>("#pick-result");
-const current = need<HTMLElement>("#current");
-const list = need<HTMLElement>("#watches");
+const form = need("#watch-form", HTMLFormElement);
+const panel = need("#panel", HTMLElement);
+const picking = need("#picking", HTMLElement);
+const chips = need("#picked", HTMLElement);
+const errors = need("#form-errors", HTMLElement);
+const result = need("#result", HTMLElement);
+const checkResult = need("#check-result", HTMLElement);
+const pickResult = need("#pick-result", HTMLElement);
+const current = need("#current", HTMLElement);
+const list = need("#watches", HTMLElement);
 
 let page: PageTab;
 
 void main();
 
 async function main(): Promise<void> {
-  need("#options").addEventListener("click", openOptions);
+  need("#options", HTMLElement).addEventListener("click", openOptions);
   const tab = await watchableTab();
   if (!tab) {
     panel.hidden = true;
-    need<HTMLElement>("#blocked").hidden = false;
+    need("#blocked", HTMLElement).hidden = false;
     return;
   }
   page = tab;
@@ -50,9 +50,9 @@ async function main(): Promise<void> {
   form.addEventListener("submit", onSubmit);
   // Parked on every committed edit, so the form survives the popup closing under a prompt.
   form.addEventListener("change", () => void stashDraft(page.id, currentDraft()));
-  need("#pick").addEventListener("click", onPick);
-  need("#check").addEventListener("click", () => void onCheck());
-  need("#site").addEventListener("click", widen);
+  need("#pick", HTMLElement).addEventListener("click", onPick);
+  need("#check", HTMLElement).addEventListener("click", () => void onCheck());
+  need("#site", HTMLElement).addEventListener("click", widen);
   list.addEventListener("click", (event) => void onRowAction(event));
   await refresh();
 }
@@ -153,7 +153,9 @@ async function offer(pick: SelectorPick): Promise<void> {
   const counts = await Promise.all(choices.map((choice) => count(choice.selector)));
   chips.replaceChildren(
     ...choices.map((choice, index) =>
-      chip(choice, counts[index] ?? null, () => choose(choices, counts, index)),
+      chip(choice, counts[index] ?? null, () => {
+        choose(choices, counts, index);
+      }),
     ),
   );
   chips.hidden = choices.length < 2;

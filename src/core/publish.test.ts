@@ -18,6 +18,12 @@ const blip = { title: "It's gone", message: ".spinner is no longer on the page."
 const responding = (status: number) =>
   vi.fn(() => Promise.resolve(new Response(null, { status }))) as unknown as typeof fetch;
 
+const initOf = (fetchImpl: typeof fetch, index: number): RequestInit | undefined => {
+  const call = vi.mocked(fetchImpl).mock.calls[index];
+  if (!call) throw new Error(`fetch has no call ${index}`);
+  return call[1];
+};
+
 describe("publishUrl", () => {
   it("encodes a protected topic as two segments", () => {
     expect(publishUrl(DEFAULT_SERVER, "@alice/tickets")).toBe(
@@ -34,18 +40,18 @@ describe("publish", () => {
   it("sends the token only when there is one", async () => {
     const fetchImpl = responding(200);
     await publish(draft, blip, fetchImpl);
-    const [, init] = vi.mocked(fetchImpl).mock.calls[0]!;
+    const init = initOf(fetchImpl, 0);
     expect((init?.headers as Record<string, string>).Authorization).toBeUndefined();
 
     await publish({ ...draft, token: " tok " }, blip, fetchImpl);
-    const [, withToken] = vi.mocked(fetchImpl).mock.calls[1]!;
+    const withToken = initOf(fetchImpl, 1);
     expect((withToken?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
   });
 
   it("sends the blip it is given, with the watch's priority", async () => {
     const fetchImpl = responding(200);
     await publish(draft, { title: "Blipr", message: "Test blip." }, fetchImpl);
-    const [, init] = vi.mocked(fetchImpl).mock.calls[0]!;
+    const init = initOf(fetchImpl, 0);
     expect(JSON.parse(init?.body as string)).toEqual({
       title: "Blipr",
       message: "Test blip.",

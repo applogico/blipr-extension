@@ -21,11 +21,11 @@ const ACTIONS: RowAction[] = [
   { action: "delete", text: "Delete" },
 ];
 
-const form = need<HTMLFormElement>("#watch-form");
-const list = need<HTMLElement>("#watches");
-const errors = need<HTMLElement>("#form-errors");
-const heading = need<HTMLElement>("#form-heading");
-const result = need<HTMLElement>("#result");
+const form = need("#watch-form", HTMLFormElement);
+const list = need("#watches", HTMLElement);
+const errors = need("#form-errors", HTMLElement);
+const heading = need("#form-heading", HTMLElement);
+const result = need("#result", HTMLElement);
 
 let editing: string | null = null;
 
@@ -33,7 +33,7 @@ void main();
 
 async function main(): Promise<void> {
   form.addEventListener("submit", onSubmit);
-  need("#cancel").addEventListener("click", () => void reset());
+  need("#cancel", HTMLElement).addEventListener("click", () => void reset());
   list.addEventListener("click", (event) => void onAction(event));
   browser.storage.onChanged.addListener(() => void refresh());
   await reset();
@@ -77,7 +77,8 @@ async function run(action: string, id: string): Promise<void> {
   if (!watch) return;
   switch (action) {
     case "edit":
-      return edit(watch);
+      edit(watch);
+      return;
     case "test":
       return test(watch);
     case "refresh":

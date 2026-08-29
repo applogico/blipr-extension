@@ -1,6 +1,6 @@
-export function need<T extends Element>(selector: string): T {
-  const node = document.querySelector<T>(selector);
-  if (!node) throw new Error(`This page is missing ${selector}.`);
+export function need<T extends Element>(selector: string, type: new () => T): T {
+  const node = document.querySelector(selector);
+  if (!(node instanceof type)) throw new Error(`This page is missing ${selector}.`);
   return node;
 }
 
