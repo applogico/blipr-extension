@@ -1,0 +1,142 @@
+// The full page: everything already saved, and one form to add or edit. Like
+// the popup it asks for host access itself, because only a user gesture may.
+import browser from "webextension-polyfill";
+
+import { onceAtATime } from "../core/guard.js";
+import type { Watch, WatchDraft } from "../core/watch.js";
+import { validate } from "../core/watch.js";
+import { send } from "../messages.js";
+import { deleteWatch, getDefaults, getWatch, getWatches, patchWatch } from "../storage.js";
+import { requestAccess } from "../ui/access.js";
+import { listErrors, need, show } from "../ui/dom.js";
+import { blankDraft, draftFrom, fillForm, readForm, toDraft } from "../ui/form.js";
+import type { RowAction } from "../ui/list.js";
+import { renderList, rowAction } from "../ui/list.js";
+import { REFRESH_TOGGLE, toggleRefresh } from "../ui/refresh.js";
+
+const ACTIONS: RowAction[] = [
+  { action: "edit", text: "Edit" },
+  { action: "test", text: "Send test blip" },
+  REFRESH_TOGGLE,
+  { action: "toggle", text: (watch) => (watch.enabled ? "Disable" : "Enable") },
+  { action: "delete", text: "Delete" },
+];
+
+const form = need("#watch-form", HTMLFormElement);
+const list = need("#watches", HTMLElement);
+const errors = need("#form-errors", HTMLElement);
+const heading = need("#form-heading", HTMLElement);
+const result = need("#result", HTMLElement);
+const saveButton = need("#save", HTMLButtonElement);
+const SAVE_LABEL = saveButton.textContent;
+
+let editing: string | null = null;
+
+void main();
+
+async function main(): Promise<void> {
+  form.addEventListener("submit", onSubmit);
+  need("#cancel", HTMLElement).addEventListener("click", () => void reset());
+  list.addEventListener("click", (event) => void onAction(event));
+  browser.storage.onChanged.addListener(() => void refresh());
+  await reset();
+  await refresh();
+}
+
+const saving = onceAtATime(async () => {
+  setSaving(true);
+  try {
+    await save(draftFrom(readForm(form), editing ?? undefined));
+  } finally {
+    setSaving(false);
+  }
+});
+
+function onSubmit(event: Event): void {
+  event.preventDefault();
+  if (saving.busy) return;
+  const problems = validate(draftFrom(readForm(form), editing ?? undefined));
+  listErrors(errors, problems);
+  // The gesture must reach `permissions.request`, so nothing is awaited before save().
+  if (problems.length === 0) void saving.run();
+}
+
+function setSaving(active: boolean): void {
+  saveButton.disabled = active;
+  saveButton.textContent = active ? "Saving…" : SAVE_LABEL;
+}
+
+async function save(draft: WatchDraft): Promise<void> {
+  const access = await requestAccess(draft.urlPattern);
+  if ("error" in access) {
+    show(result, access.error, "bad");
+    return;
+  }
+  const outcome = await send({ kind: "saveWatch", draft });
+  if ("error" in outcome) {
+    show(result, outcome.error, "bad");
+    return;
+  }
+  show(result, "Watch saved.", "good");
+  await reset();
+  await refresh();
+}
+
+async function onAction(event: Event): Promise<void> {
+  const hit = rowAction(event);
+  if (!hit) return;
+  await run(hit.action, hit.id);
+  await refresh();
+}
+
+async function run(action: string, id: string): Promise<void> {
+  const watch = await getWatch(id);
+  if (!watch) return;
+  switch (action) {
+    case "edit":
+      edit(watch);
+      return;
+    case "test":
+      return test(watch);
+    case "refresh":
+      return toggleRefresh(watch);
+    case "delete":
+      return confirmDelete(watch);
+    case "toggle":
+      // Switching one back on starts it watching from here, not from what is already on the page.
+      await patchWatch(
+        id,
+        watch.enabled ? { enabled: false } : { enabled: true, watchingSince: Date.now() },
+      );
+  }
+}
+
+function edit(watch: Watch): void {
+  editing = watch.id;
+  fillForm(form, toDraft(watch));
+  heading.textContent = "Edit watch";
+  form.scrollIntoView({ behavior: "smooth" });
+}
+
+async function confirmDelete(watch: Watch): Promise<void> {
+  if (!confirm(`Delete the watch on ${watch.topic}?`)) return;
+  await deleteWatch(watch.id);
+  if (editing === watch.id) await reset();
+}
+
+async function test(watch: Watch): Promise<void> {
+  const outcome = await send({ kind: "testWatch", draft: toDraft(watch) });
+  if ("error" in outcome) show(result, outcome.error, "bad");
+  else show(result, "Test blip sent. Check your phone.", "good");
+}
+
+async function refresh(): Promise<void> {
+  renderList(list, await getWatches(), { actions: ACTIONS });
+}
+
+async function reset(): Promise<void> {
+  editing = null;
+  heading.textContent = "Add a watch";
+  listErrors(errors, []);
+  fillForm(form, blankDraft(await getDefaults(), ""));
+}

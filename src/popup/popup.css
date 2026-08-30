@@ -1,0 +1,131 @@
+/* The popup borrows the options page palette and controls, and tightens them for a narrow window. */
+
+/* The popup lays rows out with flex, which would otherwise win over the browser's [hidden] rule. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  width: 23rem;
+  padding: 0.85rem 0.85rem 1rem;
+}
+
+main {
+  max-width: none;
+}
+
+.head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+h1 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+h2 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.8rem;
+}
+
+legend {
+  margin-bottom: 0.55rem;
+  font-size: 0.75rem;
+}
+
+fieldset + fieldset {
+  margin-top: 0.9rem;
+}
+
+fieldset:not(:last-of-type) {
+  padding-bottom: 0.9rem;
+}
+
+label {
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem;
+}
+
+input,
+select {
+  padding: 0.4rem 0.5rem;
+}
+
+button {
+  padding: 0.4rem 0.7rem;
+}
+
+.wide {
+  width: 100%;
+}
+
+.row > label {
+  flex: 1 1 6rem;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.chips {
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.chips button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hint {
+  margin: 0.4rem 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+details {
+  margin-bottom: 0.7rem;
+}
+
+summary {
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.result {
+  margin: 0.5rem 0 0.6rem;
+}
+
+.result.good {
+  color: var(--good);
+}
+
+.result.warn {
+  color: var(--muted);
+}
+
+.errors {
+  padding: 0.5rem 0.8rem 0.5rem 1.6rem;
+  font-size: 0.85rem;
+}
+
+.callout {
+  font-size: 0.9rem;
+}
+
+.watch {
+  padding: 0.6rem 0.7rem;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}

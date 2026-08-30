@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blipr</title>
+    <link rel="stylesheet" href="../options/options.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <div class="head">
+        <h1>Blipr</h1>
+        <button type="button" id="options" class="link">All watches</button>
+      </div>
+
+      <p id="blocked" class="callout" hidden>
+        Blipr watches http and https pages. Open the page you want to watch, then click the Blipr
+        icon again.
+      </p>
+
+      <div id="panel">
+        <form id="watch-form">
+          <fieldset>
+            <legend>What to watch</legend>
+
+            <label>
+              URL pattern
+              <input name="urlPattern" type="text" placeholder="https://example.com/tickets*" />
+              <small>
+                This page, and anything under it.
+                <button type="button" id="site" class="link">Whole site</button>
+              </small>
+            </label>
+
+            <label>
+              CSS selector
+              <input name="selector" type="text" placeholder=".ticket-row .buy-button" />
+            </label>
+
+            <label>
+              Text contains <span class="optional">optional</span>
+              <input name="containsText" type="text" placeholder="Sold out" />
+              <small>Only elements whose text contains this. Case does not matter.</small>
+            </label>
+
+            <div class="row">
+              <button type="button" id="pick" class="secondary">Pick element</button>
+              <button type="button" id="check" class="secondary">Check selector</button>
+            </div>
+            <p class="hint">
+              Picking asks for access to this site, then closes this popup while you click the page.
+              Open Blipr again and the selector is waiting.
+            </p>
+            <div id="picked" class="row chips" hidden></div>
+            <p id="check-result" class="result" hidden></p>
+
+            <label>
+              Element
+              <select name="condition">
+                <option value="appears">appears</option>
+                <option value="gone">is gone</option>
+              </select>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Where it goes</legend>
+
+            <label>
+              Topic
+              <input name="topic" type="text" placeholder="tickets" />
+            </label>
+
+            <details>
+              <summary>Server</summary>
+              <label>
+                Server
+                <input name="server" type="url" placeholder="https://blipr.dev" />
+              </label>
+            </details>
+
+            <details>
+              <summary>Custom title and message</summary>
+              <label>
+                Title <span class="optional">optional</span>
+                <input name="title" type="text" placeholder="It showed up" />
+              </label>
+              <label>
+                Message <span class="optional">optional</span>
+                <input name="message" type="text" placeholder="{selector} appeared on the page." />
+                <small>
+                  Leave both empty for Blipr's own wording. <code>{selector}</code>,
+                  <code>{matches}</code> and <code>{url}</code> are filled in when the blip is sent.
+                  Anything else is sent exactly as you typed it.
+                </small>
+              </label>
+            </details>
+          </fieldset>
+
+          <fieldset>
+            <legend>How it fires</legend>
+
+            <div class="row">
+              <label>
+                Priority
+                <select name="priority">
+                  <option value="1">1 &middot; min</option>
+                  <option value="2">2 &middot; low</option>
+                  <option value="3">3 &middot; default</option>
+                  <option value="4">4 &middot; high</option>
+                  <option value="5">5 &middot; time-sensitive</option>
+                </select>
+              </label>
+
+              <label>
+                Fire
+                <select name="repeat">
+                  <option value="once">once</option>
+                  <option value="every">every time</option>
+                </select>
+              </label>
+
+              <label>
+                Cooldown
+                <input name="cooldownSeconds" type="number" min="0" max="3600" step="1" />
+              </label>
+            </div>
+            <p class="hint">
+              Cooldown is the shortest gap between two blips, in seconds. 0 blips on every change.
+            </p>
+
+            <div class="row">
+              <label>
+                Refresh page
+                <select name="refresh">
+                  <option value="off">off</option>
+                  <option value="on">on</option>
+                </select>
+              </label>
+
+              <label>
+                Every <span class="optional">minutes</span>
+                <input
+                  name="refreshMinutes"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  step="1"
+                  placeholder="15"
+                />
+              </label>
+            </div>
+            <p class="hint">
+              Reloading discards anything unsaved on the page, and Blipr never reloads the tab you
+              are looking at.
+            </p>
+          </fieldset>
+
+          <ul id="form-errors" class="errors" hidden></ul>
+
+          <button type="submit" id="save" class="wide">Save watch</button>
+          <p class="hint">
+            Blipr only watches the sites you allow. Saving asks for access to this one if you have
+            not picked from it.
+          </p>
+          <p id="result" class="result" hidden></p>
+        </form>
+
+        <section id="current" hidden>
+          <h2>On this page</h2>
+          <div id="watches"></div>
+        </section>
+      </div>
+
+      <section id="picking" hidden>
+        <p><strong>Click the element you want.</strong></p>
+        <p id="pick-result" class="result" hidden></p>
+        <p class="hint">
+          Hovering outlines what you are about to pick. Escape cancels. When you have picked, open
+          Blipr again: the selector will be waiting, with a count of what it matches.
+        </p>
+      </section>
+    </main>
+
+    <script src="index.js"></script>
+  </body>
+</html>
