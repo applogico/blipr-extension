@@ -1,6 +1,6 @@
 {
   "name": "blipr-extension",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Watch any page, get a blip — a browser extension that pings your phone when an element appears or disappears.",
   "license": "MIT",
@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "lint:ext": "web-ext lint --source-dir dist/firefox",
-    "package": "node build.mjs && cd dist/chrome && zip -qr ../blipr-chrome.zip . && cd ../firefox && zip -qr ../blipr-firefox.zip ."
+    "package": "node build.mjs && cd dist/chrome && zip -qr ../blipr-chrome.zip . && cd ../firefox && zip -qr ../blipr-firefox.zip .",
+    "package:source": "mkdir -p dist && rm -f dist/blipr-source.zip && zip -qr dist/blipr-source.zip . -x 'node_modules/*' 'dist/*' '.git' '.git/*' 'web-ext-artifacts/*' '*.zip' '*/.DS_Store' '.DS_Store'"
   },
   "devDependencies": {
     "@types/webextension-polyfill": "^0.12.1",
