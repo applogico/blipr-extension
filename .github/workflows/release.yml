@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Tag, release, assets. Nothing is committed back, so nothing needs signing
+# and nothing has to be pushed past main's branch protection.
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # semantic-release reads the whole history and every tag to work out
+          # the last release.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Only reached when a release is actually due: semantic-release writes
+      # the resolved version into package.json, runs `npm run package` so the
+      # built manifests carry it, then uploads the two zips onto the release.
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
