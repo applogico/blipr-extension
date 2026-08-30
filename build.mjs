@@ -31,7 +31,9 @@ const shared = {
 
 /** Render src/manifest.ts without a separate compile step. */
 async function manifestFor(target) {
-  const tmp = join(root, ".tmp-manifest.mjs");
+  // Per target: both builds run at once, and a shared path means one can import
+  // the file while the other is still writing it.
+  const tmp = join(root, `.tmp-manifest.${target}.mjs`);
   await esbuild.build({
     entryPoints: [join(root, "src/manifest.ts")],
     outfile: tmp,

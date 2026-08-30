@@ -22,7 +22,9 @@ export function manifest(target: Target): Record<string, unknown> {
     manifest_version: 3,
     name: "Blipr",
     version: pkg.version,
-    description: "Blip your phone when an element appears on, or disappears from, a page.",
+    // Chrome shows this as the store listing's short summary, capped at 132 characters.
+    description:
+      "Watch any page for an element and get a push on your iPhone the moment it appears, or the moment the last one goes away.",
     icons,
     // No blanket host access at install: a watch asks for its own origin, so
     // the install prompt stays quiet and Firefox — where host permissions are
