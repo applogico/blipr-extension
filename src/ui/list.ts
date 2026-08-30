@@ -37,7 +37,7 @@ function row(watch: Watch, { actions = [], counts }: Options): HTMLElement {
       el("strong", { textContent: watch.topic }),
       el("span", { className: "badge", textContent: summaryLabel(watch) }),
     ]),
-    el("code", { textContent: watch.selector }),
+    matchLine(watch),
     ...(live === undefined
       ? []
       : [el("span", { className: "badge", textContent: `matches ${matchLabel(live)} now` })]),
@@ -55,6 +55,22 @@ function row(watch: Watch, { actions = [], counts }: Options): HTMLElement {
             offered.map((action) => button(action, watch)),
           ),
         ]),
+  ]);
+}
+
+/** The selector and the text filter side by side: the two together are what a watch matches. */
+function matchLine(watch: Watch): HTMLElement {
+  return el("div", { className: "match" }, [
+    el("code", { textContent: watch.selector }),
+    ...(watch.containsText
+      ? [
+          document.createTextNode(" "),
+          el("span", {
+            className: "contains",
+            textContent: `containing "${watch.containsText}"`,
+          }),
+        ]
+      : []),
   ]);
 }
 

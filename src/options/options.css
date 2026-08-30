@@ -182,6 +182,7 @@ button.secondary {
 
 .watch {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.4rem;
   padding: 0.9rem 1rem;
   margin-bottom: 0.75rem;
@@ -204,6 +205,17 @@ button.secondary {
 .badge {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.match .contains {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .watch code,
