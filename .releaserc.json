@@ -1,0 +1,34 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "npm version --no-git-tag-version --allow-same-version ${nextRelease.version} && npm run package"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "dist/blipr-chrome.zip",
+            "name": "blipr-chrome-v${nextRelease.version}.zip",
+            "label": "Chrome (v${nextRelease.version})"
+          },
+          {
+            "path": "dist/blipr-firefox.zip",
+            "name": "blipr-firefox-v${nextRelease.version}.zip",
+            "label": "Firefox (v${nextRelease.version})"
+          }
+        ],
+        "successComment": false,
+        "failComment": false,
+        "labels": false,
+        "releasedLabels": false
+      }
+    ]
+  ]
+}

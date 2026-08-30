@@ -18,11 +18,13 @@
     "package:source": "mkdir -p dist && rm -f dist/blipr-source.zip && zip -qr dist/blipr-source.zip . -x 'node_modules/*' 'dist/*' '.git' '.git/*' 'web-ext-artifacts/*' '*.zip' '*/.DS_Store' '.DS_Store'"
   },
   "devDependencies": {
+    "@semantic-release/exec": "^7.1.0",
     "@types/webextension-polyfill": "^0.12.1",
     "esbuild": "^0.24.0",
     "eslint": "^9.15.0",
     "jsdom": "^25.0.1",
     "prettier": "^3.4.1",
+    "semantic-release": "^25.0.9",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.16.0",
     "vitest": "^2.1.6",
