@@ -62,6 +62,7 @@ describe("publish", () => {
     expect(result).toEqual({
       ok: false,
       retryable: false,
+      unreachable: false,
       message: "That topic does not exist yet. Create it in the Blipr app first.",
     });
   });
@@ -73,6 +74,7 @@ describe("publish", () => {
     expect(await publish(draft, blip, responding(402))).toEqual({
       ok: false,
       retryable: false,
+      unreachable: false,
       message: "That topic hit its limit for today.",
     });
   });
@@ -86,6 +88,15 @@ describe("publish", () => {
       Promise.reject(new TypeError("network")),
     ) as unknown as typeof fetch;
     expect(await publish(draft, blip, offline)).toMatchObject({ retryable: true });
+  });
+
+  it("tells a request that never left apart from a server that answered with an error", async () => {
+    const offline = vi.fn(() =>
+      Promise.reject(new TypeError("network")),
+    ) as unknown as typeof fetch;
+    expect(await publish(draft, blip, offline)).toMatchObject({ unreachable: true });
+    expect(await publish(draft, blip, responding(500))).toMatchObject({ unreachable: false });
+    expect(await publish(draft, blip, responding(429))).toMatchObject({ unreachable: false });
   });
 
   it("refuses a topic it cannot address without sending anything", async () => {

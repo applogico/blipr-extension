@@ -1,6 +1,7 @@
 // The optional timed page reload. One alarm ticks for every watch that wants
 // one, and each tick asks storage which watches are due: the worker is gone
-// between ticks, so nothing may live in a variable.
+// between ticks, so nothing may live in a variable. The same tick resends any
+// blip a watch could not get out.
 import browser from "webextension-polyfill";
 
 import { originPattern } from "../core/origins.js";
@@ -8,6 +9,7 @@ import { isDue, tickMinutes } from "../core/refresh.js";
 import { matchesUrl } from "../core/urlmatch.js";
 import type { Watch } from "../core/watch.js";
 import { getWatches, patchWatch } from "../storage.js";
+import { resend } from "./blip.js";
 
 const ALARM = "blipr-refresh";
 
@@ -30,6 +32,7 @@ export async function onAlarm(alarm: browser.Alarms.Alarm): Promise<void> {
   // One at a time: two reloads writing the watch list at once would lose one of the stamps.
   for (const watch of watches) {
     if (isDue(watch, now)) await refresh(watch, now);
+    if (watch.unsent) await resend(watch, now);
   }
 }
 

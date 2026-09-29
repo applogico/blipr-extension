@@ -1,4 +1,15 @@
+import type { Blip } from "./message.js";
+
 export type Condition = "appears" | "gone";
+
+/** A blip that never left the machine, held for the refresh alarm to send again. */
+export type Unsent = {
+  blip: Blip;
+  firstFailedAt: number;
+  lastTriedAt: number;
+  /** Resends so far, not counting the fire that first failed. */
+  attempts: number;
+};
 
 export type Watch = {
   id: string;
@@ -32,6 +43,9 @@ export type Watch = {
   lastSuppressedAt?: number;
   lastRefreshedAt?: number;
   lastError?: string;
+  lastErrorAt?: number;
+  /** At most one: a newer unsent blip replaces an older one. */
+  unsent?: Unsent;
 };
 
 export type WatchDraft = Omit<
@@ -43,6 +57,8 @@ export type WatchDraft = Omit<
   | "lastSuppressedAt"
   | "lastRefreshedAt"
   | "lastError"
+  | "lastErrorAt"
+  | "unsent"
 > & {
   id?: string;
 };

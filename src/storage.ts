@@ -12,8 +12,12 @@ const DEFAULTS = "defaults";
 
 export type WatchDefaults = Partial<Pick<Watch, "topic" | "server" | "priority">>;
 
-/** A patch may clear `lastError`, which a plain `Partial<Watch>` cannot say. */
-export type WatchPatch = Partial<Omit<Watch, "lastError">> & { lastError?: string | undefined };
+type Clearable = "lastError" | "lastErrorAt" | "unsent";
+
+/** A patch may clear these, which a plain `Partial<Watch>` cannot say. */
+export type WatchPatch = Partial<Omit<Watch, Clearable>> & {
+  [K in Clearable]?: Watch[K] | undefined;
+};
 
 export async function getWatches(): Promise<Watch[]> {
   const stored = await browser.storage.local.get(WATCHES);
@@ -38,7 +42,7 @@ export async function patchWatch(id: string, patch: WatchPatch): Promise<Watch |
   const index = watches.findIndex((watch) => watch.id === id);
   const current = watches[index];
   if (!current) return null;
-  // The spread widens `lastError` to include undefined, which is the point of a patch.
+  // The spread widens the clearable fields to include undefined, which is the point of a patch.
   const next = { ...current, ...patch } as Watch;
   watches[index] = next;
   await setWatches(watches);

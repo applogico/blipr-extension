@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Watch } from "../core/watch.js";
-import { matchPhrase, statusText, summaryLabel } from "./text.js";
+import { clockTime, matchPhrase, statusText, summaryLabel } from "./text.js";
 
 const watch: Watch = {
   id: "w1",
@@ -45,6 +45,35 @@ describe("statusText", () => {
   it("leads with the error, not the last blip", () => {
     const failed = { ...watch, lastFiredAt: now - 60_000, lastError: "Rate limited." };
     expect(statusText(failed, now)).toBe("Rate limited.");
+  });
+
+  it("dates a failed send and says it is retrying while the blip waits", () => {
+    const failedAt = now - 3 * 60_000;
+    const unsent = {
+      blip: { title: "t", message: "m" },
+      firstFailedAt: failedAt,
+      lastTriedAt: failedAt,
+      attempts: 1,
+    };
+    const waiting = {
+      ...watch,
+      unsent,
+      lastError: "Could not reach the server.",
+      lastErrorAt: failedAt,
+    };
+    expect(statusText(waiting, now)).toBe(
+      `Couldn't reach the server at ${clockTime(failedAt)}. Retrying.`,
+    );
+  });
+
+  it("says when it gave up on a blip", () => {
+    const gaveUp = { ...watch, lastError: "Couldn't reach the server. Gave up after an hour." };
+    expect(statusText(gaveUp, now)).toBe("Couldn't reach the server. Gave up after an hour.");
+  });
+
+  it("shows the time as hours and minutes only", () => {
+    expect(clockTime(now)).not.toMatch(/\d{1,2}:\d{2}:\d{2}/);
+    expect(clockTime(now)).toMatch(/\d{1,2}:\d{2}/);
   });
 
   it("says a disabled watch is disabled, alongside why it stopped", () => {

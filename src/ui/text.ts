@@ -26,12 +26,20 @@ export function refreshLabel(watch: Pick<Watch, "refreshMinutes">): string {
 export function statusText(watch: Watch, now = Date.now()): string {
   const parts: string[] = [];
   if (!watch.enabled) parts.push("Disabled");
-  if (watch.lastError) parts.push(watch.lastError);
-  else if (watch.lastFiredAt !== undefined) parts.push(`Blipped ${when(watch.lastFiredAt, now)}`);
-  else parts.push("Waiting");
+  parts.push(latest(watch, now));
   const dropped = suppressedAt(watch);
   if (dropped !== undefined) parts.push(`Skipped a blip ${when(dropped, now)} (cooldown)`);
   return parts.join(" — ");
+}
+
+/** The error if there is one, else the last blip. */
+function latest(watch: Watch, now: number): string {
+  if (watch.enabled && watch.unsent) {
+    return retrying(watch.lastErrorAt ?? watch.unsent.lastTriedAt);
+  }
+  if (watch.lastError) return watch.lastError;
+  if (watch.lastFiredAt !== undefined) return `Blipped ${when(watch.lastFiredAt, now)}`;
+  return "Waiting";
 }
 
 /** Only worth saying while the skip is newer than the blip that caused it. */
@@ -39,6 +47,14 @@ function suppressedAt(watch: Watch): number | undefined {
   const { lastSuppressedAt } = watch;
   if (lastSuppressedAt === undefined) return undefined;
   return lastSuppressedAt > (watch.lastFiredAt ?? 0) ? lastSuppressedAt : undefined;
+}
+
+function retrying(failedAt: number): string {
+  return `Couldn't reach the server at ${clockTime(failedAt)}. Retrying.`;
+}
+
+export function clockTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function when(timestamp: number, now: number): string {

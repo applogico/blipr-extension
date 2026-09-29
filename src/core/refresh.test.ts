@@ -39,6 +39,18 @@ describe("tickMinutes", () => {
     expect(tickMinutes([{ ...every5, refreshMinutes: 2, enabled: false }, every5])).toBe(5);
   });
 
+  it("ticks every minute while a blip is waiting to go out again", () => {
+    const unsent = {
+      blip: { title: "t", message: "m" },
+      firstFailedAt: 0,
+      lastTriedAt: 0,
+      attempts: 0,
+    };
+    expect(tickMinutes([every5, { enabled: true, unsent }])).toBe(1);
+    expect(tickMinutes([{ enabled: true, unsent }])).toBe(1);
+    expect(tickMinutes([every5, { enabled: false, unsent }])).toBe(5);
+  });
+
   it("asks for no alarm at all when nothing refreshes", () => {
     expect(tickMinutes([{ ...every5, refresh: false }])).toBe(null);
     expect(tickMinutes([])).toBe(null);

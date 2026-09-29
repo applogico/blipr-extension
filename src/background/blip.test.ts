@@ -3,18 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RETRY_DELAY_MS } from "../core/cooldown.js";
 import type { Blip, Occasion } from "../core/message.js";
 import type { PublishOutcome } from "../core/publish.js";
-import type { Watch, WatchDraft } from "../core/watch.js";
+import type { Unsent, Watch, WatchDraft } from "../core/watch.js";
 import type { WatchPatch } from "../storage.js";
 
 const mocks = vi.hoisted(() => ({
   patchWatch: vi.fn<(id: string, patch: WatchPatch) => Promise<null>>(),
+  getWatch: vi.fn<(id: string) => Promise<Watch | null>>(),
   publish: vi.fn<(draft: WatchDraft, blip: Blip) => Promise<PublishOutcome>>(),
 }));
 
-vi.mock("../storage.js", () => ({ patchWatch: mocks.patchWatch }));
+vi.mock("../storage.js", () => ({ patchWatch: mocks.patchWatch, getWatch: mocks.getWatch }));
 vi.mock("../core/publish.js", () => ({ publish: mocks.publish }));
 
-const { fire } = await import("./blip.js");
+const { GAVE_UP, fire, resend } = await import("./blip.js");
 
 const watch: Watch = {
   id: "w1",
@@ -45,6 +46,7 @@ const FINAL_REASONS = [
 const failure = (message: string, retryable: boolean): PublishOutcome => ({
   ok: false,
   retryable,
+  unreachable: message === UNREACHABLE,
   message,
 });
 
@@ -75,6 +77,7 @@ beforeEach(() => {
     if (id === stored.id) stored = { ...stored, ...patch } as Watch;
     return Promise.resolve(null);
   });
+  mocks.getWatch.mockImplementation((id) => Promise.resolve(id === stored.id ? stored : null));
   mocks.publish.mockResolvedValue({ ok: true });
 });
 
@@ -222,5 +225,170 @@ describe("fire, when the server is unreachable", () => {
     expect(after.lastError).toBeUndefined();
     expect(after.enabled).toBe(false);
     expect(blipOf(1)).toEqual(blipOf(0));
+  });
+});
+
+describe("fire, when the blip never leaves the machine", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const firedOffline = async (subject: Watch, at: Occasion = occasion): Promise<Watch> => {
+    const running = fired(subject, at);
+    await vi.runAllTimersAsync();
+    return running;
+  };
+
+  it("keeps the blip on the watch to send again, and dates the error", async () => {
+    mocks.publish.mockResolvedValue(failure(UNREACHABLE, true));
+    const after = await firedOffline(watch);
+    expect(after.unsent).toEqual({
+      blip: blipOf(0),
+      firstFailedAt: expect.any(Number) as number,
+      lastTriedAt: expect.any(Number) as number,
+      attempts: 0,
+    });
+    expect(after.lastError).toBe(UNREACHABLE);
+    expect(after.lastErrorAt).toEqual(expect.any(Number));
+  });
+
+  it("keeps nothing when the server answered, even with an error", async () => {
+    for (const reason of [RATE_LIMITED, MISSING_TOPIC]) {
+      mocks.publish.mockResolvedValue(failure(reason, reason === RATE_LIMITED));
+      const after = await firedOffline(watch);
+      expect(after.unsent).toBeUndefined();
+      expect(after).toMatchObject({ lastError: reason, lastErrorAt: expect.any(Number) as number });
+    }
+  });
+
+  it("holds only the newest unsent blip", async () => {
+    mocks.publish.mockResolvedValue(failure(UNREACHABLE, true));
+    const older: Unsent = {
+      blip: { title: "old", message: "old" },
+      firstFailedAt: 1_000,
+      lastTriedAt: 1_000,
+      attempts: 3,
+    };
+    const after = await firedOffline({ ...watch, cooldownSeconds: 0, unsent: older });
+    expect(after.unsent).toMatchObject({ blip: blipOf(0), attempts: 0 });
+    expect(after.unsent?.firstFailedAt).toBeGreaterThan(older.firstFailedAt);
+  });
+
+  it("drops a waiting blip once a newer one lands", async () => {
+    const older: Unsent = {
+      blip: { title: "old", message: "old" },
+      firstFailedAt: 1,
+      lastTriedAt: 1,
+      attempts: 1,
+    };
+    const after = await firedOffline({ ...watch, cooldownSeconds: 0, unsent: older });
+    expect(after.unsent).toBeUndefined();
+    expect(after.lastErrorAt).toBeUndefined();
+  });
+});
+
+describe("resend", () => {
+  const MINUTE = 60_000;
+  const failedAt = Date.UTC(2026, 8, 16, 18, 41);
+  const unsent: Unsent = {
+    blip: { title: "It's gone", message: ".spinner is no longer on the page." },
+    firstFailedAt: failedAt,
+    lastTriedAt: failedAt,
+    attempts: 0,
+  };
+  const waiting: Watch = {
+    ...watch,
+    unsent,
+    lastError: UNREACHABLE,
+    lastErrorAt: failedAt,
+    lastFiredAt: failedAt,
+  };
+
+  const resent = async (subject: Watch, now: number): Promise<Watch> => {
+    stored = { ...subject };
+    await resend(subject, now);
+    return stored;
+  };
+
+  it("sends the stored blip again and clears the error once it lands", async () => {
+    const after = await resent(waiting, failedAt + MINUTE);
+    expect(mocks.publish).toHaveBeenCalledTimes(1);
+    expect(blipOf(0)).toEqual(unsent.blip);
+    expect(after.unsent).toBeUndefined();
+    expect(after.lastError).toBeUndefined();
+    expect(after.lastErrorAt).toBeUndefined();
+  });
+
+  it("spends a fire-once watch on a resend that landed", async () => {
+    expect(await resent({ ...waiting, once: true }, failedAt + MINUTE)).toMatchObject({
+      enabled: false,
+    });
+  });
+
+  it("waits longer after every miss: 1, 2, 4, 8, then 15 minutes at most", async () => {
+    const waits = [1, 2, 4, 8, 15, 15];
+    for (const [attempts, minutes] of waits.entries()) {
+      const subject = { ...waiting, unsent: { ...unsent, attempts, firstFailedAt: failedAt } };
+      mocks.publish.mockClear();
+      await resent(subject, failedAt + minutes * MINUTE - 31_000);
+      expect(mocks.publish).not.toHaveBeenCalled();
+      await resent(subject, failedAt + minutes * MINUTE);
+      expect(mocks.publish).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("counts a miss and says when it last tried", async () => {
+    mocks.publish.mockResolvedValue(failure(UNREACHABLE, true));
+    const now = failedAt + 2 * MINUTE;
+    const after = await resent(waiting, now);
+    expect(after.unsent).toEqual({ ...unsent, attempts: 1, lastTriedAt: now });
+    expect(after).toMatchObject({ lastError: UNREACHABLE, lastErrorAt: now });
+  });
+
+  it("gives up after the seventh miss, and says so", async () => {
+    mocks.publish.mockResolvedValue(failure(UNREACHABLE, true));
+    const lastTry = failedAt + 45 * MINUTE;
+    const now = lastTry + 15 * MINUTE;
+    const after = await resent(
+      { ...waiting, unsent: { ...unsent, attempts: 6, lastTriedAt: lastTry } },
+      now,
+    );
+    expect(after.unsent).toBeUndefined();
+    expect(after).toMatchObject({ lastError: GAVE_UP, lastErrorAt: now });
+  });
+
+  it("gives up without sending once the blip is past the hour", async () => {
+    const now = failedAt + 65 * MINUTE;
+    const after = await resent(waiting, now);
+    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(after.unsent).toBeUndefined();
+    expect(after).toMatchObject({ lastError: GAVE_UP, lastErrorAt: now });
+  });
+
+  it("stops resending once the server answers, and shows its reason", async () => {
+    mocks.publish.mockResolvedValue(failure(MISSING_TOPIC, false));
+    const after = await resent(waiting, failedAt + MINUTE);
+    expect(after.unsent).toBeUndefined();
+    expect(after.lastError).toBe(MISSING_TOPIC);
+  });
+
+  it("leaves a disabled watch alone", async () => {
+    await resent({ ...waiting, enabled: false }, failedAt + MINUTE);
+    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(mocks.patchWatch).not.toHaveBeenCalled();
+  });
+
+  it("never overwrites a newer blip that failed while the resend was in flight", async () => {
+    const newer: Unsent = { ...unsent, firstFailedAt: failedAt + 30_000 };
+    mocks.publish.mockImplementation(() => {
+      stored = { ...stored, unsent: newer };
+      return Promise.resolve({ ok: true });
+    });
+    const after = await resent(waiting, failedAt + MINUTE);
+    expect(after.unsent).toEqual(newer);
   });
 });

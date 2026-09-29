@@ -42,7 +42,7 @@ onMessage({
   },
 
   watchError: async ({ watchId, error }) => {
-    await patchWatch(watchId, { lastError: error });
+    await patchWatch(watchId, { lastError: error, lastErrorAt: Date.now() });
   },
 
   armPicker: async ({ tabId }) => {

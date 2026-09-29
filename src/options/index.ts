@@ -6,6 +6,7 @@ import { onceAtATime } from "../core/guard.js";
 import type { Watch, WatchDraft } from "../core/watch.js";
 import { validate } from "../core/watch.js";
 import { send } from "../messages.js";
+import type { WatchPatch } from "../storage.js";
 import { deleteWatch, getDefaults, getWatch, getWatches, patchWatch } from "../storage.js";
 import { requestAccess } from "../ui/access.js";
 import { listErrors, need, show } from "../ui/dom.js";
@@ -106,9 +107,16 @@ async function run(action: string, id: string): Promise<void> {
       // Switching one back on starts it watching from here, not from what is already on the page.
       await patchWatch(
         id,
-        watch.enabled ? { enabled: false } : { enabled: true, watchingSince: Date.now() },
+        watch.enabled ? disabled(watch) : { enabled: true, watchingSince: Date.now() },
       );
   }
+}
+
+/** Switching a watch off also drops a blip still waiting to go out, and the error that came with it. */
+function disabled(watch: Watch): WatchPatch {
+  return watch.unsent
+    ? { enabled: false, unsent: undefined, lastError: undefined, lastErrorAt: undefined }
+    : { enabled: false };
 }
 
 function edit(watch: Watch): void {
