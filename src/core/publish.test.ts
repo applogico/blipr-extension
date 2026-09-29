@@ -88,6 +88,18 @@ describe("publish", () => {
     expect(await publish(draft, blip, offline)).toMatchObject({ retryable: true });
   });
 
+  it("names what stopped a request that never left the machine", async () => {
+    const offline = vi.fn(() =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    ) as unknown as typeof fetch;
+    const outcome = await publish(draft, blip, offline);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.message).toMatch(
+      /^Could not reach the server \(TypeError: Failed to fetch; online (true|false|unknown)\)\.$/,
+    );
+  });
+
   it("refuses a topic it cannot address without sending anything", async () => {
     const fetchImpl = responding(200);
     const result = await publish({ ...draft, topic: "@alice/tickets" }, blip, fetchImpl);
