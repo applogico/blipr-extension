@@ -19,16 +19,25 @@ const BY_STATUS: Record<number, Verdict> = {
   429: { retryable: true, message: "Rate limited by the server." },
 };
 
-const UNREACHABLE: Verdict = { retryable: true, message: "Could not reach the server." };
+/** Names the failure so a row says what stopped the request, not just that it stopped. */
+function unreachable(cause: unknown): Verdict {
+  const reason = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+  // Absent under Node, where the tests run; the worker always has it.
+  const state = (globalThis as { navigator?: { onLine?: unknown } }).navigator?.onLine;
+  const online = typeof state === "boolean" ? String(state) : "unknown";
+  return { retryable: true, message: `Could not reach the server (${reason}; online ${online}).` };
+}
 
 /** Whether a failed publish is worth another attempt, and what to show for it. */
 function classify(error: unknown): Verdict {
-  if (!(error instanceof BliprError)) return UNREACHABLE;
+  if (!(error instanceof BliprError)) return unreachable(error);
   if (error.status === undefined) {
     // The SDK carries a `cause` only when the request never left the machine.
     // Without one it refused the call itself — a topic it cannot address, or a
     // blip with nothing in it — and no retry changes that.
-    return error.cause === undefined ? { retryable: false, message: error.message } : UNREACHABLE;
+    return error.cause === undefined
+      ? { retryable: false, message: error.message }
+      : unreachable(error.cause);
   }
   // Anything unlisted keeps the SDK's message, which carries the server's reason.
   return BY_STATUS[error.status] ?? { retryable: error.status >= 500, message: error.message };
