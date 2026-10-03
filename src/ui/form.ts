@@ -1,89 +1,17 @@
-// The watch form, in and out. The mapping between what the controls hold and
-// what a `WatchDraft` is lives in `draftFrom`/`valuesFrom`, away from the DOM.
-import type { Condition, Watch, WatchDraft } from "../core/watch.js";
+// The watch a form starts from and what it hands back. The editor keeps the
+// draft in memory; these are the pure edges of that.
+import type { Watch, WatchDraft } from "../core/watch.js";
 import {
-  DEFAULT_COOLDOWN_SECONDS,
   DEFAULT_PRIORITY,
   DEFAULT_SERVER,
+  MAX_REFRESH_MINUTES,
+  MIN_REFRESH_MINUTES,
+  clampCooldown,
   cooldownSecondsOf,
 } from "../core/watch.js";
 import type { WatchDefaults } from "../storage.js";
 
-const FIELDS = [
-  "urlPattern",
-  "selector",
-  "containsText",
-  "condition",
-  "topic",
-  "server",
-  "title",
-  "message",
-  "priority",
-  "repeat",
-  "cooldownSeconds",
-  "refresh",
-  "refreshMinutes",
-] as const;
-
-type Field = (typeof FIELDS)[number];
-export type FormValues = Record<Field, string>;
-
-export function draftFrom(values: FormValues, id?: string): WatchDraft {
-  const containsText = values.containsText.trim();
-  const title = values.title.trim();
-  const message = values.message.trim();
-  const priority = Number(values.priority.trim());
-  return {
-    urlPattern: values.urlPattern.trim(),
-    selector: values.selector.trim(),
-    condition: condition(values.condition),
-    topic: values.topic.trim(),
-    server: values.server.trim() || DEFAULT_SERVER,
-    priority: Number.isInteger(priority) && priority > 0 ? priority : DEFAULT_PRIORITY,
-    once: values.repeat === "once",
-    cooldownSeconds: cooldownFrom(values.cooldownSeconds),
-    ...refreshFrom(values),
-    ...(containsText ? { containsText } : {}),
-    ...(title ? { title } : {}),
-    ...(message ? { message } : {}),
-    ...(id ? { id } : {}),
-  };
-}
-
-/** A cleared box is a deliberate zero: no cooldown, blip on every transition. */
-function cooldownFrom(value: string): number {
-  const seconds = Number(value.trim());
-  return Number.isInteger(seconds) && seconds >= 0 ? seconds : DEFAULT_COOLDOWN_SECONDS;
-}
-
-/** A blank interval is no interval at all, rather than a zero. */
-function refreshFrom(values: FormValues): Pick<WatchDraft, "refresh" | "refreshMinutes"> {
-  const minutes = values.refreshMinutes.trim();
-  return {
-    ...(values.refresh === "on" ? { refresh: true } : {}),
-    ...(minutes ? { refreshMinutes: Number(minutes) } : {}),
-  };
-}
-
-export function valuesFrom(draft: WatchDraft): FormValues {
-  return {
-    urlPattern: draft.urlPattern,
-    selector: draft.selector,
-    containsText: draft.containsText ?? "",
-    condition: draft.condition,
-    topic: draft.topic,
-    server: draft.server,
-    title: draft.title ?? "",
-    message: draft.message ?? "",
-    priority: String(draft.priority),
-    repeat: draft.once ? "once" : "every",
-    cooldownSeconds: String(cooldownSecondsOf(draft)),
-    refresh: draft.refresh ? "on" : "off",
-    refreshMinutes: draft.refreshMinutes === undefined ? "" : String(draft.refreshMinutes),
-  };
-}
-
-/** A new watch inherits the last one's settings, so the usual case is pick and save. */
+/** A new watch starts from the defaults in Settings, so the usual case is pick and save. */
 export function blankDraft(defaults: WatchDefaults, urlPattern: string): WatchDraft {
   return {
     urlPattern,
@@ -93,7 +21,7 @@ export function blankDraft(defaults: WatchDefaults, urlPattern: string): WatchDr
     server: defaults.server ?? DEFAULT_SERVER,
     priority: defaults.priority ?? DEFAULT_PRIORITY,
     once: true,
-    cooldownSeconds: DEFAULT_COOLDOWN_SECONDS,
+    cooldownSeconds: clampCooldown(defaults.cooldownSeconds),
   };
 }
 
@@ -116,23 +44,44 @@ export function toDraft(watch: Watch): WatchDraft {
   };
 }
 
-export function readForm(form: HTMLFormElement): FormValues {
-  const values = {} as FormValues;
-  for (const name of FIELDS) values[name] = field(form, name).value;
-  return values;
+/** Trimmed, with every empty optional field left out rather than saved blank. */
+export function cleanDraft(draft: WatchDraft): WatchDraft {
+  const { containsText, title, message, refresh, ...rest } = draft;
+  return {
+    ...rest,
+    urlPattern: rest.urlPattern.trim(),
+    selector: rest.selector.trim(),
+    topic: rest.topic.trim(),
+    server: rest.server.trim() || DEFAULT_SERVER,
+    ...(refresh ? { refresh: true } : {}),
+    ...kept("containsText", containsText),
+    ...kept("title", title),
+    ...kept("message", message),
+  };
 }
 
-export function fillForm(form: HTMLFormElement, draft: WatchDraft): void {
-  const values = valuesFrom(draft);
-  for (const name of FIELDS) field(form, name).value = values[name];
+function kept<K extends string>(name: K, value: string | undefined): Partial<Record<K, string>> {
+  const trimmed = value?.trim() ?? "";
+  return trimmed ? ({ [name]: trimmed } as Record<K, string>) : {};
 }
 
-function field(form: HTMLFormElement, name: Field): HTMLInputElement | HTMLSelectElement {
-  const node = form.elements.namedItem(name);
-  if (node instanceof HTMLInputElement || node instanceof HTMLSelectElement) return node;
-  throw new Error(`The form has no ${name} field.`);
+/** Switching the reload on starts at the fastest interval unless one was set before. */
+export function withRefresh(draft: WatchDraft, on: boolean): WatchDraft {
+  if (!on) {
+    const rest = { ...draft };
+    delete rest.refresh;
+    return rest;
+  }
+  return { ...draft, refresh: true, refreshMinutes: draft.refreshMinutes ?? MIN_REFRESH_MINUTES };
 }
 
-function condition(value: string): Condition {
-  return value === "gone" ? "gone" : "appears";
+export const REFRESH_BOUNDS = { min: MIN_REFRESH_MINUTES, max: MAX_REFRESH_MINUTES, step: 1 };
+
+/** The topic becomes the default only for a first watch, and only with the box ticked. */
+export function shouldRememberTopic(
+  defaults: WatchDefaults,
+  useAsDefault: boolean,
+  topic: string,
+): boolean {
+  return !defaults.topic && useAsDefault && topic.trim() !== "";
 }

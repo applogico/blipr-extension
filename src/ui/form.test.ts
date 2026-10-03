@@ -1,137 +1,101 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_COOLDOWN_SECONDS, DEFAULT_PRIORITY, DEFAULT_SERVER } from "../core/watch.js";
-import { blankDraft, draftFrom, valuesFrom } from "./form.js";
+import type { WatchDraft } from "../core/watch.js";
+import { DEFAULT_PRIORITY, DEFAULT_SERVER } from "../core/watch.js";
+import { blankDraft, cleanDraft, shouldRememberTopic, withRefresh } from "./form.js";
+import { stepValue } from "./stepper.js";
 
-const values = {
+const draft: WatchDraft = {
   urlPattern: " https://example.com/* ",
   selector: " .spinner ",
-  containsText: "",
+  containsText: "  ",
   condition: "gone",
   topic: " ci ",
-  server: " https://blipr.dev ",
-  title: "  ",
+  server: " ",
+  title: " Build done ",
   message: "",
-  priority: "5",
-  repeat: "every",
-  cooldownSeconds: "5",
-  refresh: "off",
-  refreshMinutes: "",
+  priority: 5,
+  once: false,
+  cooldownSeconds: 10,
 };
 
-describe("draftFrom", () => {
-  it("trims what the user typed and reads the two selects as their meaning", () => {
-    expect(draftFrom(values)).toEqual({
+describe("blankDraft", () => {
+  it("starts from the defaults in Settings", () => {
+    const blank = blankDraft({ topic: "ci", priority: 4, cooldownSeconds: 30 }, "https://x.dev/*");
+    expect(blank).toMatchObject({ topic: "ci", priority: 4, cooldownSeconds: 30, once: true });
+  });
+
+  it("falls back to Blipr's own defaults, and lifts an old cooldown to the floor", () => {
+    const blank = blankDraft({ cooldownSeconds: 5 }, "https://x.dev/*");
+    expect(blank).toMatchObject({
+      topic: "",
+      server: DEFAULT_SERVER,
+      priority: DEFAULT_PRIORITY,
+      cooldownSeconds: 10,
+    });
+  });
+});
+
+describe("cleanDraft", () => {
+  it("trims, drops empty optional fields, and never saves a blank server", () => {
+    expect(cleanDraft(draft)).toEqual({
       urlPattern: "https://example.com/*",
       selector: ".spinner",
       condition: "gone",
       topic: "ci",
-      server: "https://blipr.dev",
+      server: DEFAULT_SERVER,
+      title: "Build done",
       priority: 5,
       once: false,
-      cooldownSeconds: 5,
+      cooldownSeconds: 10,
     });
   });
+});
 
-  it("leaves refresh out entirely when the page is not being reloaded", () => {
-    expect(draftFrom(values)).not.toHaveProperty("refresh");
-    expect(draftFrom(values)).not.toHaveProperty("refreshMinutes");
+describe("withRefresh", () => {
+  it("switches on at one minute, and keeps an interval set before", () => {
+    expect(withRefresh(draft, true)).toMatchObject({ refresh: true, refreshMinutes: 1 });
+    expect(withRefresh({ ...draft, refreshMinutes: 15 }, true).refreshMinutes).toBe(15);
   });
 
-  it("reads the refresh switch and its interval as a number of minutes", () => {
-    const refreshing = draftFrom({ ...values, refresh: "on", refreshMinutes: " 15 " });
-    expect(refreshing.refresh).toBe(true);
-    expect(refreshing.refreshMinutes).toBe(15);
-  });
-
-  it("keeps an interval that is switched off, so switching it back on remembers it", () => {
-    const paused = draftFrom({ ...values, refresh: "off", refreshMinutes: "15" });
-    expect(paused).not.toHaveProperty("refresh");
-    expect(paused.refreshMinutes).toBe(15);
-  });
-
-  it("keeps custom wording only when there is some", () => {
-    expect(draftFrom(values)).not.toHaveProperty("title");
-    expect(draftFrom(values)).not.toHaveProperty("message");
-    const worded = draftFrom({ ...values, title: " Build done ", message: "{matches} left" });
-    expect(worded.title).toBe("Build done");
-    expect(worded.message).toBe("{matches} left");
-  });
-
-  it("falls back rather than saving an empty server or a priority of NaN", () => {
-    const bare = draftFrom({ ...values, server: "", priority: "" });
-    expect(bare.server).toBe(DEFAULT_SERVER);
-    expect(bare.priority).toBe(DEFAULT_PRIORITY);
+  it("keeps the interval when switched off, so switching back remembers it", () => {
+    const off = withRefresh({ ...draft, refresh: true, refreshMinutes: 15 }, false);
+    expect(off).not.toHaveProperty("refresh");
+    expect(off.refreshMinutes).toBe(15);
   });
 });
 
-describe("draftFrom, cooldown", () => {
-  it("reads a cleared box as no cooldown at all, not as the default", () => {
-    expect(draftFrom({ ...values, cooldownSeconds: "" }).cooldownSeconds).toBe(0);
-    expect(draftFrom({ ...values, cooldownSeconds: " 0 " }).cooldownSeconds).toBe(0);
+describe("stepValue", () => {
+  const reload = { min: 1, max: 1440, step: 1 };
+  const cooldown = { min: 10, max: 3600, step: 10 };
+
+  it("steps by one minute and stops at both ends", () => {
+    expect(stepValue(1, 1, reload)).toBe(2);
+    expect(stepValue(1, -1, reload)).toBe(1);
+    expect(stepValue(1440, 1, reload)).toBe(1440);
   });
 
-  it("keeps a longer window the user asked for", () => {
-    expect(draftFrom({ ...values, cooldownSeconds: " 90 " }).cooldownSeconds).toBe(90);
+  it("steps the cooldown by ten, never under ten seconds", () => {
+    expect(stepValue(10, 1, cooldown)).toBe(20);
+    expect(stepValue(10, -1, cooldown)).toBe(10);
+    expect(stepValue(3600, 1, cooldown)).toBe(3600);
   });
 
-  it("falls back to the default rather than saving nonsense", () => {
-    expect(draftFrom({ ...values, cooldownSeconds: "abc" }).cooldownSeconds).toBe(
-      DEFAULT_COOLDOWN_SECONDS,
-    );
-  });
-});
-
-describe("draftFrom, containsText", () => {
-  it("leaves the text filter out entirely when the field is blank", () => {
-    expect(draftFrom(values)).not.toHaveProperty("containsText");
-    expect(draftFrom({ ...values, containsText: "   " })).not.toHaveProperty("containsText");
-  });
-
-  it("trims what the user typed but keeps the case they typed it in", () => {
-    expect(draftFrom({ ...values, containsText: " Sold Out " }).containsText).toBe("Sold Out");
+  it("snaps an off-step value to the grid", () => {
+    expect(stepValue(15, 1, cooldown)).toBe(20);
+    expect(stepValue(15, -1, cooldown)).toBe(10);
+    expect(stepValue(Number.NaN, 1, cooldown)).toBe(20);
   });
 });
 
-describe("valuesFrom", () => {
-  it("round-trips a draft back through the controls", () => {
-    const draft = draftFrom(values);
-    expect(draftFrom(valuesFrom(draft))).toEqual(draft);
+describe("shouldRememberTopic, the first-run default", () => {
+  it("saves the topic when there is no default yet and the box is ticked", () => {
+    expect(shouldRememberTopic({}, true, "alerts")).toBe(true);
   });
 
-  it("puts a fire-once watch on the 'once' option", () => {
-    expect(valuesFrom(blankDraft({}, "https://example.com/*")).repeat).toBe("once");
-  });
-
-  it("round-trips a draft with a text filter", () => {
-    const draft = draftFrom({ ...values, containsText: "Sold out" });
-    expect(draftFrom(valuesFrom(draft))).toEqual(draft);
-  });
-
-  it("shows a blank box for a watch with no text filter", () => {
-    expect(valuesFrom(draftFrom(values)).containsText).toBe("");
-  });
-
-  it("round-trips a refreshing draft too", () => {
-    const draft = draftFrom({ ...values, refresh: "on", refreshMinutes: "15" });
-    expect(draftFrom(valuesFrom(draft))).toEqual(draft);
-  });
-
-  it("starts a new watch with refreshing off", () => {
-    const blank = valuesFrom(blankDraft({}, "https://example.com/*"));
-    expect(blank.refresh).toBe("off");
-    expect(blank.refreshMinutes).toBe("");
-  });
-
-  it("starts a new watch on the default cooldown, not on a blank box", () => {
-    expect(valuesFrom(blankDraft({}, "https://example.com/*")).cooldownSeconds).toBe(
-      String(DEFAULT_COOLDOWN_SECONDS),
-    );
-  });
-
-  it("shows a watch saved before cooldowns existed the default it is getting", () => {
-    const legacy = draftFrom(values);
-    delete legacy.cooldownSeconds;
-    expect(valuesFrom(legacy).cooldownSeconds).toBe(String(DEFAULT_COOLDOWN_SECONDS));
+  it("leaves an existing default alone, and respects an unticked box", () => {
+    expect(shouldRememberTopic({ topic: "tickets" }, true, "alerts")).toBe(false);
+    expect(shouldRememberTopic({}, false, "alerts")).toBe(false);
+    expect(shouldRememberTopic({}, true, "  ")).toBe(false);
   });
 });

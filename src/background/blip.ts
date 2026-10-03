@@ -37,8 +37,12 @@ export async function fire(watch: Watch, occasion: Occasion): Promise<void> {
 }
 
 function recordOf(watch: Watch, outcome: PublishOutcome): WatchPatch {
-  if (!outcome.ok) return { lastError: outcome.message };
-  return { lastError: undefined, ...(watch.once ? { enabled: false } : {}) };
+  if (!outcome.ok) return { lastError: outcome.message, lastErrorAt: Date.now() };
+  return {
+    lastError: undefined,
+    lastErrorAt: undefined,
+    ...(watch.once ? { enabled: false } : {}),
+  };
 }
 
 function delay(ms: number): Promise<void> {

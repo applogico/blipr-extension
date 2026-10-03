@@ -2,172 +2,88 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
     <title>Blipr</title>
+    <link rel="stylesheet" href="../ui/theme.css" />
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
+    <header class="opt-hd">
+      <div class="opt-hd-in">
+        <img class="mark" src="../icons/blipr-mark.svg" alt="" />
+        <span class="brand">Blipr</span>
+        <nav class="tabs" aria-label="Sections">
+          <a href="#watches" id="tab-watches">Watches</a>
+          <a href="#settings" id="tab-settings">Settings</a>
+        </nav>
+        <div class="grow"></div>
+        <span id="conn"></span>
+      </div>
+    </header>
+
     <main>
-      <h1>Blipr</h1>
-      <p class="lede">
-        Watch a page for an element and get a blip on your phone the moment it shows up, or the
-        moment the last one goes away.
-      </p>
-      <p class="callout">
-        Create the topic in the Blipr app first. Publishing to a topic that does not exist yet is
-        refused by the server.
-      </p>
+      <h1 class="visually-hidden" id="page-title">Watches</h1>
+      <section id="watches" class="opt-bd one" aria-labelledby="tab-watches"></section>
 
-      <section>
-        <h2>Watches</h2>
-        <div id="watches"></div>
-        <p id="result" class="result" hidden></p>
-      </section>
-
-      <section>
-        <h2 id="form-heading">Add a watch</h2>
-        <form id="watch-form">
-          <fieldset>
-            <legend>What to watch</legend>
-
-            <label>
-              URL pattern
-              <input name="urlPattern" type="text" placeholder="https://example.com/tickets*" />
-              <small>
-                Matched against the whole URL. <code>*</code> is the only wildcard. Saving asks for
-                access to that site, and Blipr only watches the sites you allow.
-              </small>
-            </label>
-
-            <label>
-              CSS selector
-              <input name="selector" type="text" placeholder=".ticket-row .buy-button" />
-            </label>
-
-            <label>
-              Text contains <span class="optional">optional</span>
-              <input name="containsText" type="text" placeholder="Sold out" />
-              <small>
-                Narrows the selector to elements whose text contains this. Case does not matter, and
-                a blank box watches everything the selector matches.
-              </small>
-            </label>
-
-            <label>
-              Blip when the element
-              <select name="condition">
-                <option value="appears">appears</option>
-                <option value="gone">is gone</option>
-              </select>
-              <small>
-                <strong>Appears</strong> fires as soon as the selector matches at least one element,
-                including if it already matches when the page loads. <strong>Is gone</strong> means
-                the selector matches nothing at all: either it matched earlier on this page and
-                every match went away, or it never matched and the page has been settled for 5
-                seconds. That grace period keeps a half-rendered page from firing instantly.
-              </small>
-            </label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Where it goes</legend>
-
-            <label>
-              Topic
-              <input name="topic" type="text" placeholder="tickets" />
-            </label>
-
-            <label>
-              Server
-              <input name="server" type="url" placeholder="https://blipr.dev" />
-            </label>
-
-            <details>
-              <summary>Custom title and message</summary>
-              <label>
-                Title <span class="optional">optional</span>
-                <input name="title" type="text" placeholder="It showed up" />
-              </label>
-              <label>
-                Message <span class="optional">optional</span>
-                <input name="message" type="text" placeholder="{selector} appeared on the page." />
-                <small>
-                  Leave both empty for Blipr's own wording. <code>{selector}</code>,
-                  <code>{matches}</code> and <code>{url}</code> are filled in when the blip is sent
-                  — the watch's selector, how many elements it matched, and the page it was on.
-                  Anything else in braces is sent exactly as you typed it.
-                </small>
-              </label>
-            </details>
-          </fieldset>
-
-          <fieldset>
-            <legend>How it fires</legend>
-
-            <div class="row">
-              <label>
-                Priority
-                <select name="priority">
-                  <option value="1">1 &middot; min</option>
-                  <option value="2">2 &middot; low</option>
-                  <option value="3">3 &middot; default</option>
-                  <option value="4">4 &middot; high</option>
-                  <option value="5">5 &middot; time-sensitive</option>
-                </select>
-              </label>
-
-              <label>
-                Fire
-                <select name="repeat">
-                  <option value="once">once, then stop</option>
-                  <option value="every">every time</option>
-                </select>
-              </label>
-
-              <label>
-                Cooldown <span class="optional">seconds</span>
-                <input name="cooldownSeconds" type="number" min="0" max="3600" step="1" />
-              </label>
+      <section id="settings" class="opt-bd" aria-labelledby="tab-settings" hidden>
+        <div class="side">
+          <h2>Connection</h2>
+          <p>Where every watch sends its blips. Most people never change the server.</p>
+        </div>
+        <div class="card stack">
+          <div class="field">
+            <label class="label" for="server">Server</label>
+            <div class="input">
+              <input id="server" class="mono" type="url" spellcheck="false" autocomplete="off" />
             </div>
-            <p class="hint">
-              Cooldown is the shortest gap between two blips. 0 blips on every change.
-            </p>
-
-            <div class="row">
-              <label>
-                Refresh the page
-                <select name="refresh">
-                  <option value="off">off</option>
-                  <option value="on">on</option>
-                </select>
-              </label>
-
-              <label>
-                Every <span class="optional">minutes</span>
-                <input
-                  name="refreshMinutes"
-                  type="number"
-                  min="1"
-                  max="1440"
-                  step="1"
-                  placeholder="15"
-                />
-              </label>
-            </div>
-            <p class="hint">
-              Reloading discards anything unsaved on the page, and Blipr never reloads the tab you
-              are looking at.
-            </p>
-          </fieldset>
-
-          <ul id="form-errors" class="errors" hidden></ul>
-
-          <div class="row">
-            <button type="submit" id="save">Save watch</button>
-            <button type="button" id="cancel" class="secondary">Clear</button>
+            <p id="server-error" class="result bad" hidden></p>
           </div>
-        </form>
+          <div class="check-row">
+            <button type="button" id="check" class="btn secondary">Check connection</button>
+            <span id="check-result" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <div class="side">
+          <h2>Defaults for new watches</h2>
+          <p>Filled in on every new watch. Each watch can still change them.</p>
+        </div>
+        <div class="card stack">
+          <div class="two">
+            <div class="field">
+              <label class="label" for="default-topic">Topic</label>
+              <div class="input">
+                <input id="default-topic" type="text" spellcheck="false" autocomplete="off" />
+              </div>
+              <p class="hint">Create it in the Blipr app first.</p>
+            </div>
+            <div class="field">
+              <span class="label" id="cooldown-label">Cooldown</span>
+              <div class="stepper-row" id="cooldown"></div>
+              <p class="hint">
+                The shortest gap between two blips from one watch. At least 10 seconds, in steps of
+                10.
+              </p>
+            </div>
+          </div>
+          <div id="default-priority"></div>
+        </div>
+
+        <div class="side">
+          <h2>Site access</h2>
+          <p>Blipr only reads the sites you allow. Removing one turns its watches off.</p>
+          <p>
+            <b>Keep the page open in a tab.</b> A watch runs only while its page is open; the tab
+            can be in the background.
+          </p>
+        </div>
+        <div id="sites" class="card rows"></div>
       </section>
     </main>
+
+    <dialog id="edit-dialog" aria-label="Edit watch">
+      <div id="editor"></div>
+    </dialog>
 
     <script src="index.js"></script>
   </body>

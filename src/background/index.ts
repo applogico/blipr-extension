@@ -7,7 +7,7 @@ import browser from "webextension-polyfill";
 import { hostOf, originPattern } from "../core/origins.js";
 import { matchesUrl } from "../core/urlmatch.js";
 import type { Watch, WatchDraft } from "../core/watch.js";
-import { validate } from "../core/watch.js";
+import { migrateWatch, validate } from "../core/watch.js";
 import type { Responses } from "../messages.js";
 import { onMessage, sendToTab } from "../messages.js";
 import {
@@ -16,13 +16,13 @@ import {
   getWatches,
   patchWatch,
   putWatch,
-  rememberDefaults,
   stashPick,
   takePick,
   WATCHES,
 } from "../storage.js";
 import { setPickBadge } from "./badge.js";
 import { TEST_BLIP, attempt, fire } from "./blip.js";
+import { checkConnection } from "./connection.js";
 import { onAlarm, scheduleRefreshes } from "./refresh.js";
 import { ensureContentScript, injectInto, syncContentScripts } from "./registration.js";
 
@@ -76,6 +76,8 @@ onMessage({
     const outcome = await attempt(draft, TEST_BLIP);
     return outcome.ok ? { ok: true } : { error: outcome.message };
   },
+
+  checkConnection: ({ server }) => checkConnection(server),
 });
 
 browser.runtime.onStartup.addListener(() => void catchUp());
@@ -85,7 +87,7 @@ browser.permissions.onRemoved.addListener(() => void syncContentScripts());
 browser.tabs.onRemoved.addListener((tabId) => void forgetTab(tabId));
 browser.alarms.onAlarm.addListener((alarm) => void onAlarm(alarm));
 browser.storage.onChanged.addListener((changes, area) => {
-  // Remembering the last-used defaults is not a reason to re-register anything.
+  // Defaults, preferences and connection checks are not a reason to re-register anything.
   if (area === "local" && WATCHES in changes) void catchUp();
 });
 
@@ -95,7 +97,8 @@ async function catchUp(): Promise<void> {
   await scheduleRefreshes();
 }
 
-async function save(draft: WatchDraft): Promise<Responses["saveWatch"]> {
+async function save(raw: WatchDraft): Promise<Responses["saveWatch"]> {
+  const draft = migrateWatch(raw);
   const problems = validate(draft);
   if (problems.length > 0) return { error: problems.join(" ") };
 
@@ -107,7 +110,6 @@ async function save(draft: WatchDraft): Promise<Responses["saveWatch"]> {
 
   const watch = await settled(draft);
   await putWatch(watch);
-  await rememberDefaults(draft);
   await syncContentScripts();
   await injectInto(origin);
   return { saved: watch };

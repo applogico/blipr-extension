@@ -1,278 +1,235 @@
-// The toolbar popup: build a watch for the tab you are on. It never publishes
-// and never registers anything — the background does that — but it does ask
-// for host access, which only a user gesture is allowed to do.
+// The toolbar popup: what is watching this page, what else is running, and
+// the form for a new or edited watch. It never publishes and never registers
+// anything (the background does that), but it does ask for host access, which
+// only a user gesture is allowed to do.
 import browser from "webextension-polyfill";
 
-import { onceAtATime } from "../core/guard.js";
+import { isStale } from "../core/connection.js";
 import type { SelectorPick } from "../core/selector.js";
 import { matchesUrl, suggestPattern } from "../core/urlmatch.js";
-import type { WatchDraft } from "../core/watch.js";
-import { validate } from "../core/watch.js";
+import type { Watch, WatchDraft } from "../core/watch.js";
+import { DEFAULT_SERVER } from "../core/watch.js";
 import { send } from "../messages.js";
-import { forgetTab, getDefaults, getWatch, getWatches, stashDraft, takeDraft } from "../storage.js";
+import type { WatchDefaults } from "../storage.js";
+import {
+  forgetTab,
+  getConnection,
+  getDefaults,
+  getPrefs,
+  getWatches,
+  setPrefs,
+  stashDraft,
+  takeDraft,
+} from "../storage.js";
 import { requestAccess } from "../ui/access.js";
-import { el, listErrors, need, show } from "../ui/dom.js";
-import { blankDraft, draftFrom, fillForm, readForm } from "../ui/form.js";
-import { renderList, rowAction } from "../ui/list.js";
-import { REFRESH_TOGGLE, toggleRefresh } from "../ui/refresh.js";
+import { connectionPillEl } from "../ui/controls.js";
+import { el, need, show } from "../ui/dom.js";
+import { mountEditor } from "../ui/editor.js";
+import { blankDraft, toDraft } from "../ui/form.js";
 import type { PageTab } from "../ui/tab.js";
-import { watchableTab } from "../ui/tab.js";
-import { matchLabel, matchPhrase } from "../ui/text.js";
-
-type Choice = { label: string; selector: string; strict: boolean };
+import { activeTab, openOptions, openTabUrls } from "../ui/tab.js";
+import { connectionPill, savedToast } from "../ui/text.js";
+import type { HomeActions } from "./home.js";
+import { homeContent } from "./home.js";
 
 const UNREACHABLE = "Blipr cannot reach this page. Reload it, then try again.";
-const CLOSE_DELAY_MS = 800;
+const MARK = "../icons/blipr-mark.svg";
 
-const form = need("#watch-form", HTMLFormElement);
-const panel = need("#panel", HTMLElement);
-const picking = need("#picking", HTMLElement);
-const chips = need("#picked", HTMLElement);
-const errors = need("#form-errors", HTMLElement);
-const result = need("#result", HTMLElement);
-const checkResult = need("#check-result", HTMLElement);
-const pickResult = need("#pick-result", HTMLElement);
-const current = need("#current", HTMLElement);
-const list = need("#watches", HTMLElement);
-const saveButton = need("#save", HTMLButtonElement);
-const SAVE_LABEL = saveButton.textContent;
+const home = need("#home", HTMLElement);
+const homeBody = need("#home-body", HTMLElement);
+const editorRoot = need("#editor", HTMLElement);
+const conn = need("#conn", HTMLElement);
 
-let page: PageTab;
+let page: PageTab | null = null;
+let defaults: WatchDefaults = {};
+let view: "home" | "editor" | "picking" = "home";
+let toastText: string | null = null;
+let renders = 0;
+
+const ACTIONS: HomeActions = {
+  onPick: startPickFromHome,
+  onOpenWatch: (watch) => {
+    openEditor(toDraft(watch));
+  },
+  onToggleGroup: (open) => void setPrefs({ othersOpen: open }),
+  onSeeAll: () =>
+    void openOptions("watches").then(() => {
+      window.close();
+    }),
+};
 
 void main();
 
+/** The draft is already stashed per tab, so the editor comes back as it was. */
+function openSettings(): void {
+  void openOptions("settings").then(() => {
+    window.close();
+  });
+}
+
 async function main(): Promise<void> {
-  need("#options", HTMLElement).addEventListener("click", openOptions);
-  const tab = await watchableTab();
-  if (!tab) {
-    panel.hidden = true;
-    need("#blocked", HTMLElement).hidden = false;
-    return;
-  }
-  page = tab;
-  await restore();
-  form.addEventListener("submit", onSubmit);
-  // Parked on every committed edit, so the form survives the popup closing under a prompt.
-  form.addEventListener("change", () => void stashDraft(page.id, currentDraft()));
-  need("#pick", HTMLElement).addEventListener("click", onPick);
-  need("#check", HTMLElement).addEventListener("click", () => void onCheck());
-  need("#site", HTMLElement).addEventListener("click", widen);
-  list.addEventListener("click", (event) => void onRowAction(event));
-  await refresh();
+  need("#settings", HTMLElement).addEventListener("click", openSettings);
+  page = await activeTab();
+  defaults = await getDefaults();
+  browser.storage.onChanged.addListener(() => void onStorage());
+  if (!(page?.watchable && (await resume(page)))) await renderHome();
+  void checkIfStale();
+}
+
+async function onStorage(): Promise<void> {
+  defaults = await getDefaults();
+  await renderHeader();
+  if (view === "home") await renderHome();
 }
 
 /** Picking, and a permission prompt on Chrome, both close the popup mid-edit. */
-async function restore(): Promise<void> {
+async function resume(tab: PageTab): Promise<boolean> {
   const [parked, pick] = await Promise.all([
-    takeDraft(page.id),
-    send({ kind: "takePick", tabId: page.id }),
+    takeDraft(tab.id),
+    send({ kind: "takePick", tabId: tab.id }).catch(() => null),
   ]);
-  const base = parked ?? blankDraft(await getDefaults(), suggestPattern(page.url));
-  fillForm(form, pick ? { ...base, selector: pick.unique } : base);
-  if (pick) await offer(pick);
+  if (!parked && !pick) return false;
+  const base = parked ?? blankDraft(defaults, suggestPattern(tab.url));
+  openEditor(base, pick);
+  await renderHeader();
+  return true;
 }
 
-const saving = onceAtATime(async () => {
-  setSaving(true);
-  try {
-    await save(currentDraft());
-  } finally {
-    setSaving(false);
-  }
-});
-
-function onSubmit(event: Event): void {
-  event.preventDefault();
-  if (saving.busy) return;
-  const draft = currentDraft();
-  const problems = validate(draft);
-  listErrors(errors, problems);
-  if (problems.length > 0) return;
-  // Chrome closes the popup under its own permission prompt, so the draft is
-  // parked without awaiting: an await here would spend the gesture that
-  // `permissions.request` needs.
-  void stashDraft(page.id, draft);
-  void saving.run();
+async function renderHeader(): Promise<void> {
+  const server = defaults.server ?? DEFAULT_SERVER;
+  const pill = connectionPillEl(connectionPill(await getConnection(), server));
+  conn.replaceChildren(...(pill ? [pill] : []));
 }
 
-function setSaving(active: boolean): void {
-  saveButton.disabled = active;
-  saveButton.textContent = active ? "Saving…" : SAVE_LABEL;
+async function renderHome(): Promise<void> {
+  const ticket = (renders += 1);
+  const [watches, connection, prefs, openUrls] = await Promise.all([
+    getWatches(),
+    getConnection(),
+    getPrefs(),
+    openTabUrls(),
+  ]);
+  if (ticket !== renders || view !== "home") return;
+  const server = defaults.server ?? DEFAULT_SERVER;
+  const snapshot = { page, watches, connection, server, openUrls, toast: toastText };
+  const key =
+    document.activeElement instanceof HTMLElement ? document.activeElement.dataset.key : undefined;
+  homeBody.replaceChildren(
+    ...homeContent({ ...snapshot, othersOpen: prefs.othersOpen, now: Date.now() }, ACTIONS),
+  );
+  if (key) homeBody.querySelector<HTMLElement>(`[data-key="${key}"]`)?.focus();
+  await renderHeader();
 }
 
-async function save(draft: WatchDraft): Promise<void> {
-  const access = await requestAccess(draft.urlPattern);
-  if ("error" in access) {
-    show(result, access.error, "bad");
-    return;
-  }
-  const outcome = await send({ kind: "saveWatch", draft });
-  if ("error" in outcome) {
-    show(result, outcome.error, "bad");
-    return;
-  }
-  await forgetTab(page.id);
-  await reset();
-  show(result, "Watch saved. Blipr is watching this page now.", "good");
-  await refresh();
-  setTimeout(() => {
-    window.close();
-  }, CLOSE_DELAY_MS);
+function showHome(toast: string | null = null): void {
+  toastText = toast;
+  view = "home";
+  editorRoot.hidden = true;
+  editorRoot.replaceChildren();
+  home.hidden = false;
+  void renderHome();
 }
 
-/** What a fresh open would show: this tab's pattern and the defaults, none of the watch just saved. */
-async function reset(): Promise<void> {
-  listErrors(errors, []);
-  chips.replaceChildren();
-  chips.hidden = true;
-  checkResult.hidden = true;
-  pickResult.hidden = true;
-  fillForm(form, blankDraft(await getDefaults(), suggestPattern(page.url)));
+function openEditor(draft: WatchDraft, pick: SelectorPick | null = null): void {
+  if (!page) return;
+  const tab = page;
+  view = "editor";
+  home.hidden = true;
+  editorRoot.hidden = false;
+  const leave = (toast: string | null) => {
+    void forgetTab(tab.id);
+    showHome(toast);
+  };
+  mountEditor(
+    editorRoot,
+    {
+      pageUrl: tab.url,
+      pickable: tab.watchable && (draft.id === undefined || matchesUrl(draft.urlPattern, tab.url)),
+      markSrc: MARK,
+      count: (selector, containsText) => count(tab.id, selector, containsText),
+      onPickAgain: startPick,
+      onChange: (next) => void stashDraft(tab.id, next),
+      onBack: () => {
+        leave(null);
+      },
+      onOpenSettings: openSettings,
+      onSaved: (watch: Watch) => {
+        leave(savedToast(watch.selector));
+      },
+      onDeleted: () => {
+        leave(null);
+      },
+    },
+    { draft, defaults, pick },
+  );
+}
+
+function startPickFromHome(): void {
+  if (!page) return;
+  startPick(blankDraft(defaults, suggestPattern(page.url)));
 }
 
 /**
  * Picking is where access is asked for. Both engines only allow a permission
- * prompt from a user gesture, and on Chrome that prompt closes the popup —
+ * prompt from a user gesture, and on Chrome that prompt closes the popup,
  * which picking does anyway, so the two interruptions collapse into one and
  * saving afterwards needs no prompt at all.
  */
-function onPick(): void {
-  const draft = currentDraft();
-  // Nothing is awaited first: an await would spend the gesture the prompt needs,
-  // and nothing after it runs once Chrome has closed this popup.
+function startPick(draft: WatchDraft): void {
+  if (!page) return;
+  // Nothing is awaited first: an await would spend the gesture the prompt needs.
   void stashDraft(page.id, draft);
-  void pick(draft);
+  void pick(page, draft);
 }
 
-async function pick(draft: WatchDraft): Promise<void> {
-  const [access, armed] = await Promise.all([requestAccess(draft.urlPattern), armPicker()]);
-  if (!armed) {
-    show(result, UNREACHABLE, "bad");
-    return;
-  }
-  panel.hidden = true;
-  picking.hidden = false;
-  if ("error" in access) show(pickResult, access.error, "bad");
-}
-
-/** The picker runs on the active tab either way; access is what the watch needs later. */
-function armPicker(): Promise<boolean> {
-  return send({ kind: "armPicker", tabId: page.id }).then(
-    () => true,
-    () => false,
-  );
-}
-
-async function onCheck(): Promise<void> {
-  const draft = currentDraft();
-  if (!draft.selector) {
-    show(checkResult, "Type or pick a selector first.", "warn");
-    return;
-  }
-  const matches = await count(draft.selector, draft.containsText ?? "");
-  if (matches === null) {
-    show(checkResult, UNREACHABLE, "bad");
-    return;
-  }
-  show(checkResult, matchPhrase(matches), matches > 0 ? "good" : "warn");
-}
-
-/** A pick offers the one element and everything like it: a watch is about the set. */
-async function offer(pick: SelectorPick): Promise<void> {
-  const choices: Choice[] = [{ label: "This element", selector: pick.unique, strict: true }];
-  if (pick.similar && pick.similar.selector !== pick.unique) {
-    choices.push({ label: "All similar", selector: pick.similar.selector, strict: false });
-  }
-  const containsText = currentDraft().containsText ?? "";
-  const counts = await Promise.all(choices.map((choice) => count(choice.selector, containsText)));
-  chips.replaceChildren(
-    ...choices.map((choice, index) =>
-      chip(choice, counts[index] ?? null, () => {
-        choose(choices, counts, index);
-      }),
+async function pick(tab: PageTab, draft: WatchDraft): Promise<void> {
+  const [access, armed] = await Promise.all([
+    requestAccess(draft.urlPattern),
+    send({ kind: "armPicker", tabId: tab.id }).then(
+      () => true,
+      () => false,
     ),
-  );
-  chips.hidden = choices.length < 2;
-  choose(choices, counts, 0);
+  ]);
+  if (!armed) void forgetTab(tab.id);
+  showPicking(armed, "error" in access ? access.error : null);
 }
 
-function chip(choice: Choice, matches: number | null, onChoose: () => void): HTMLElement {
-  const suffix = matches === null ? "" : ` · ${matchLabel(matches)}`;
-  const node = el("button", {
-    type: "button",
-    className: "secondary",
-    textContent: `${choice.label}${suffix}`,
-  });
-  node.addEventListener("click", onChoose);
-  return node;
-}
-
-function choose(choices: Choice[], counts: Array<number | null>, index: number): void {
-  const choice = choices[index];
-  if (!choice) return;
-  const matches = counts[index] ?? null;
-  setField("selector", choice.selector);
-  show(checkResult, picked(choice, matches), matches ? "good" : "warn");
-  [...chips.children].forEach((node, at) => {
-    node.setAttribute("aria-pressed", String(at === index));
-  });
-}
-
-function picked(choice: Choice, matches: number | null): string {
-  if (matches === null) return "Picked from the page.";
-  if (choice.strict && matches > 1) {
-    return `Picked, but this is the closest Blipr got: ${matchPhrase(matches)}`;
-  }
-  return `Picked from the page. ${matchPhrase(matches)}`;
-}
-
-async function refresh(): Promise<void> {
-  const watches = (await getWatches()).filter((watch) => matchesUrl(watch.urlPattern, page.url));
-  current.hidden = watches.length === 0;
-  if (watches.length === 0) return;
-  const counted = await Promise.all(
-    watches.map((watch) => count(watch.selector, watch.containsText ?? "")),
-  );
-  const pairs = watches.map((watch, index) => [watch.id, counted[index] ?? 0] as const);
-  renderList(list, watches, { actions: [REFRESH_TOGGLE], counts: Object.fromEntries(pairs) });
-}
-
-/** Starting and stopping the reloads is the one thing a row here can do. */
-async function onRowAction(event: Event): Promise<void> {
-  const hit = rowAction(event);
-  if (hit?.action !== "refresh") return;
-  const watch = await getWatch(hit.id);
-  if (!watch) return;
-  await toggleRefresh(watch);
-  await refresh();
+function showPicking(armed: boolean, accessError: string | null): void {
+  view = "picking";
+  editorRoot.hidden = true;
+  home.hidden = false;
+  const result = el("p", { className: "result", hidden: true });
+  const lead = armed
+    ? [
+        el("strong", { textContent: "Click the element to watch" }),
+        el("p", {
+          className: "hint",
+          textContent:
+            "Hovering outlines what you are about to pick. Escape cancels. When you have picked, open Blipr again: the selector will be waiting, with a count of what it matches.",
+        }),
+      ]
+    : [];
+  const problem = armed ? accessError : UNREACHABLE;
+  if (problem) show(result, problem, "bad");
+  homeBody.replaceChildren(el("div", { className: "card picking" }, [...lead, result]));
 }
 
 /** null when the page cannot be reached at all, which is not the same as zero. */
-async function count(selector: string, containsText: string): Promise<number | null> {
-  const counted = await send({
-    kind: "countMatches",
-    tabId: page.id,
-    selector,
-    containsText,
-  }).catch(() => null);
+async function count(
+  tabId: number,
+  selector: string,
+  containsText: string,
+): Promise<number | null> {
+  const counted = await send({ kind: "countMatches", tabId, selector, containsText }).catch(
+    () => null,
+  );
   if (!counted || "error" in counted) return null;
   return counted.matches;
 }
 
-function currentDraft(): WatchDraft {
-  return draftFrom(readForm(form));
-}
-
-function widen(): void {
-  setField("urlPattern", `${new URL(page.url).origin}/*`);
-}
-
-function setField(name: string, value: string): void {
-  const node = form.elements.namedItem(name);
-  if (node instanceof HTMLInputElement) node.value = value;
-}
-
-function openOptions(): void {
-  void browser.runtime.openOptionsPage();
-  window.close();
+/** The pill reads the last answer; an old or missing one is refreshed in the background. */
+async function checkIfStale(): Promise<void> {
+  const server = defaults.server ?? DEFAULT_SERVER;
+  if (!isStale(await getConnection(), server, Date.now())) return;
+  await send({ kind: "checkConnection", server }).catch(() => undefined);
 }

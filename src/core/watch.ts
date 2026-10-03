@@ -32,6 +32,7 @@ export type Watch = {
   lastSuppressedAt?: number;
   lastRefreshedAt?: number;
   lastError?: string;
+  lastErrorAt?: number;
 };
 
 export type WatchDraft = Omit<
@@ -43,6 +44,7 @@ export type WatchDraft = Omit<
   | "lastSuppressedAt"
   | "lastRefreshedAt"
   | "lastError"
+  | "lastErrorAt"
 > & {
   id?: string;
 };
@@ -52,13 +54,27 @@ export const DEFAULT_PRIORITY = 3;
 /** A browser alarm will not tick faster than once a minute, so minutes are the unit. */
 export const MIN_REFRESH_MINUTES = 1;
 export const MAX_REFRESH_MINUTES = 1440;
-/** Only a transition fires, so this guards a flapping DOM and nothing else. */
-export const DEFAULT_COOLDOWN_SECONDS = 5;
-export const MIN_COOLDOWN_SECONDS = 0;
+/** No watch may blip faster than once every ten seconds. */
+export const DEFAULT_COOLDOWN_SECONDS = 10;
+export const MIN_COOLDOWN_SECONDS = 10;
 export const MAX_COOLDOWN_SECONDS = 3600;
+export const COOLDOWN_STEP_SECONDS = 10;
+
+/** Stored values from before the floor existed are lifted to it, never trusted below it. */
+export function clampCooldown(seconds: number | undefined): number {
+  if (seconds === undefined || !Number.isFinite(seconds)) return DEFAULT_COOLDOWN_SECONDS;
+  return Math.min(MAX_COOLDOWN_SECONDS, Math.max(MIN_COOLDOWN_SECONDS, Math.ceil(seconds)));
+}
 
 export function cooldownSecondsOf(watch: Pick<Watch, "cooldownSeconds">): number {
-  return watch.cooldownSeconds ?? DEFAULT_COOLDOWN_SECONDS;
+  return clampCooldown(watch.cooldownSeconds);
+}
+
+/** A watch saved under the old floor reads back at the new one. */
+export function migrateWatch<T extends Pick<Watch, "cooldownSeconds">>(watch: T): T {
+  if (watch.cooldownSeconds === undefined) return watch;
+  const cooldownSeconds = clampCooldown(watch.cooldownSeconds);
+  return cooldownSeconds === watch.cooldownSeconds ? watch : { ...watch, cooldownSeconds };
 }
 
 type Rule = { passes: (draft: WatchDraft) => boolean; problem: string };

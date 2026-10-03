@@ -8,7 +8,9 @@ Blips are delivered by [Blipr](https://blipr.dev). You need the iOS app to recei
 
 ## Install
 
-Not in the stores yet. Build it and load it unpacked:
+Get it from the [Chrome Web Store](https://chromewebstore.google.com/detail/blipr/dlnfnblappmldconmihnmocjdakpnhci). Firefox is not published yet.
+
+To run it from source, build it and load it unpacked:
 
 ```sh
 npm install
@@ -25,13 +27,19 @@ pick `dist/firefox/manifest.json`. Temporary add-ons are removed when Firefox re
 
 1. Create the topic in the Blipr app first. Publishing to a topic that does not exist is refused.
 2. Open the page you want to watch and click the Blipr toolbar icon.
-3. **Pick element**. Blipr asks the browser for access to that one site, and the popup gets out of
-   the way — which is what picking does anyway. Click the thing on the page you care about, then
-   open Blipr again: the selector is waiting, with a count of what it matches.
-4. Choose whether to blip when it **appears** or when it **is gone**, name your topic, and save.
-   Access is already granted, so saving is one click and no prompt.
-5. If you type a selector by hand and never pick, saving asks for access instead. Blipr cannot
-   watch a site you have not allowed, so declining means the watch is not saved.
+3. **Pick an element to watch**. Blipr asks the browser for access to that one site, and the popup
+   gets out of the way. Hover the page to see the selector and how many things it matches, then
+   click. Open Blipr again: the form is waiting with what you picked.
+4. Choose whether to blip when it **appears** or when it **is gone**, and the topic. Your first
+   watch offers to keep that topic as the default for new ones. Priority, repeat, tab refresh, the
+   pages to watch and your own wording live under **More options**. Save.
+
+The popup always shows what is watching the page you are on, and folds every other watch into one
+line that still flags trouble: a paused watch (its page is not open in any tab) or one with an
+error. The options page lists every watch grouped by site, and holds the settings: the server and
+a connection check, the defaults for new watches, and the sites Blipr may read.
+
+Every watch has a cooldown of at least 10 seconds between blips. Set the default in Settings.
 
 A watch is about a _set_ of elements, not one. "Is gone" means the selector matches nothing, which
 is how you watch a page full of spinners and get pinged when the last one finishes.
@@ -40,7 +48,7 @@ A watch never blips for what was already on the page when you made it. It starts
 you were looking at and blips on the next change — the element turning up after it was missing, or
 the last one going away.
 
-Manage or delete watches from the options page.
+Manage or delete watches from the popup or the options page.
 
 ## Your own wording
 
@@ -65,7 +73,7 @@ A watch runs inside the page, so the tab has to stay open — close it and the w
 are not looking at is also throttled by the browser, and plenty of sites stop updating their own
 DOM while they are hidden, so a change can go unnoticed until you look at the tab.
 
-**Refresh the page** is the answer to that. Switch it on for a watch, give it a number of minutes,
+**Keep the tab fresh** (under More options) is the answer to that. Switch it on for a watch, give it a number of minutes,
 and Blipr reloads that tab on the timer. A reload produces a fresh page whatever the site does in
 the background.
 
@@ -77,9 +85,7 @@ the background.
 - Only a tab that is already open and matches the watch's URL pattern is reloaded. Blipr never
   opens one.
 - A disabled watch, and a "once" watch that has already blipped, stop being refreshed.
-- Once an interval is set, the watch's own row — in the popup and on the options page — carries a
-  one-click switch, so you can start and stop the reloads without opening the form. The interval
-  stays where you put it.
+- Switching it off keeps the interval, so switching it back on picks up where you left it.
 
 ## Develop
 
