@@ -34,6 +34,16 @@ button { font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", system-
 button:focus-visible { outline: 2px solid #a3a8fc; outline-offset: 2px; }
 `;
 
+const HOST_STYLE: Array<[string, string]> = [
+  ["display", "block"],
+  ["visibility", "visible"],
+  ["opacity", "1"],
+  ["position", "static"],
+  ["contain", "none"],
+  ["filter", "none"],
+  ["transform", "none"],
+];
+
 type Overlay = { host: HTMLElement; box: HTMLElement; tip: HTMLElement; cancel: HTMLElement };
 
 let overlay: Overlay | null = null;
@@ -57,6 +67,8 @@ export function arm(onPick: (picked: SelectorPick) => void): void {
 
 function build(): Overlay {
   const host = document.createElement("blipr-picker");
+  // Pages hide undefined custom elements (Reddit: :not(:defined)); inline !important wins.
+  for (const [name, value] of HOST_STYLE) host.style.setProperty(name, value, "important");
   const root = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = STYLE;
