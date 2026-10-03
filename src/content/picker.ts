@@ -3,6 +3,8 @@
 // and node back out again. The overlay lives in a shadow root under a custom
 // tag, so the page's styles cannot reach it and no page selector matches it.
 import type { SelectorPick } from "../core/selector.js";
+import type { Layer } from "../core/layers.js";
+import { firstUseful, stepLayer } from "../core/layers.js";
 import { pick } from "../core/selector.js";
 import { matchesOnPage } from "../ui/text.js";
 
@@ -36,6 +38,11 @@ type Overlay = { host: HTMLElement; box: HTMLElement; tip: HTMLElement; cancel: 
 
 let overlay: Overlay | null = null;
 let hovered: Element | null = null;
+// Everything under the pointer, topmost first, and which one is outlined.
+let layers: Element[] = [];
+let layerIndex = 0;
+// Elements ↑ climbed out of, so ↓ can come back down.
+let lifted: Element[] = [];
 let frame = 0;
 let report: ((picked: SelectorPick) => void) | null = null;
 
@@ -59,7 +66,15 @@ function build(): Overlay {
   const bar = node("div", "bar");
   const kbd = node("kbd", "", "Esc");
   const cancel = node("button", "", "Cancel");
-  bar.append("Click the element to watch", kbd, cancel);
+  bar.append(
+    "Click the element to watch",
+    node("kbd", "", "↑"),
+    "Bigger",
+    node("kbd", "", "Tab"),
+    "Next layer",
+    kbd,
+    cancel,
+  );
   layer.append(box, tip, bar);
   root.append(style, layer);
   return { host, box, tip, cancel };
@@ -79,6 +94,9 @@ function disarm(): void {
   overlay?.host.remove();
   overlay = null;
   hovered = null;
+  layers = [];
+  layerIndex = 0;
+  lifted = [];
   report = null;
 }
 
@@ -99,11 +117,60 @@ function listen(on: boolean): void {
 }
 
 function onMove(event: Event): void {
-  const target = event.target instanceof Element ? event.target : null;
-  if (target === overlay?.host) return;
-  if (target === hovered) return;
-  hovered = target;
+  if (!(event instanceof MouseEvent) || !overlay) return;
+  const host = overlay.host;
+  const stack = document
+    .elementsFromPoint(event.clientX, event.clientY)
+    .filter((el) => el !== host && el !== document.documentElement && el !== document.body);
+  layers = stack;
+  layerIndex = firstUseful(stack.map(describe));
+  lifted = [];
+  const chosen = stack[layerIndex];
+  if (chosen) setHovered(chosen);
+}
+
+function setHovered(el: Element): void {
+  if (el === hovered) return;
+  hovered = el;
   schedule();
+}
+
+/** Measures one layer for the cover check in core/layers. */
+function describe(el: Element): Layer {
+  const rect = el.getBoundingClientRect();
+  return { hasContent: showsSomething(el), area: rect.width * rect.height };
+}
+
+const MEDIA = "img, svg, video, canvas, picture, iframe, input, textarea, select";
+
+/** Visible text or media, ignoring screen-reader-only text clipped to a pixel. */
+function showsSomething(el: Element): boolean {
+  if (el.matches(MEDIA)) return true;
+  return hasVisibleBox(Array.from(el.querySelectorAll(MEDIA)).slice(0, 20)) || hasVisibleText(el);
+}
+
+function hasVisibleText(el: Element): boolean {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let seen = 0; seen < 50; seen += 1) {
+    const text = walker.nextNode();
+    if (!text) return false;
+    if (!text.textContent?.trim()) continue;
+    range.selectNodeContents(text);
+    // Screen-reader-only text overflows a 1px clipped box, so its container must be visible too.
+    const holder = text.parentElement;
+    if (!holder || !isVisibleBox(holder.getBoundingClientRect())) continue;
+    if (isVisibleBox(range.getBoundingClientRect())) return true;
+  }
+  return false;
+}
+
+function isVisibleBox(box: DOMRect): boolean {
+  return box.width > 2 && box.height > 2;
+}
+
+function hasVisibleBox(elements: Element[]): boolean {
+  return elements.some((el) => isVisibleBox(el.getBoundingClientRect()));
 }
 
 /** Building a selector queries the page, so it happens at most once a frame. */
@@ -152,7 +219,8 @@ function onClick(event: Event): void {
     disarm();
     return;
   }
-  const target = event.target;
+  // The outlined element, which may sit under a cover or be one ↑ climbed to.
+  const target = hovered ?? event.target;
   if (!(target instanceof Element) || target === current?.host) return;
   const send = report;
   // Tear down first, so the overlay is never part of what the selector is built from.
@@ -161,9 +229,50 @@ function onClick(event: Event): void {
 }
 
 function onKey(event: Event): void {
-  if (!(event instanceof KeyboardEvent) || event.key !== "Escape") return;
+  if (!(event instanceof KeyboardEvent)) return;
+  const action = KEYS[event.key];
+  if (!action) return;
   swallow(event);
-  disarm();
+  action(event);
+}
+
+const KEYS: Record<string, (event: KeyboardEvent) => void> = {
+  Escape: () => {
+    disarm();
+  },
+  Tab: (event) => {
+    nextLayer(event.shiftKey);
+  },
+  ArrowUp: () => {
+    climb();
+  },
+  ArrowDown: () => {
+    descend();
+  },
+};
+
+/** Tab: the next element stacked under the pointer. */
+function nextLayer(backwards: boolean): void {
+  if (layers.length === 0) return;
+  layerIndex = stepLayer(layerIndex, layers.length, backwards);
+  lifted = [];
+  const next = layers[layerIndex];
+  if (next) setHovered(next);
+}
+
+/** ↑: the element around the outlined one. */
+function climb(): void {
+  const parent = hovered?.parentElement;
+  if (!hovered || !parent || parent === document.body || parent === document.documentElement)
+    return;
+  lifted.push(hovered);
+  setHovered(parent);
+}
+
+/** ↓: back to what ↑ climbed out of. */
+function descend(): void {
+  const back = lifted.pop();
+  if (back) setHovered(back);
 }
 
 function swallow(event: Event): void {
