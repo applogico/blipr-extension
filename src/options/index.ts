@@ -1,142 +1,118 @@
-// The full page: everything already saved, and one form to add or edit. Like
-// the popup it asks for host access itself, because only a user gesture may.
+// The full page: every watch grouped by site, and the settings that are not
+// per watch. The two tabs are hash routes, so the popup can open either one.
 import browser from "webextension-polyfill";
 
-import { onceAtATime } from "../core/guard.js";
-import type { Watch, WatchDraft } from "../core/watch.js";
-import { validate } from "../core/watch.js";
+import { matchesUrl } from "../core/urlmatch.js";
+import type { Watch } from "../core/watch.js";
+import { DEFAULT_SERVER } from "../core/watch.js";
 import { send } from "../messages.js";
-import { deleteWatch, getDefaults, getWatch, getWatches, patchWatch } from "../storage.js";
-import { requestAccess } from "../ui/access.js";
-import { listErrors, need, show } from "../ui/dom.js";
-import { blankDraft, draftFrom, fillForm, readForm, toDraft } from "../ui/form.js";
-import type { RowAction } from "../ui/list.js";
-import { renderList, rowAction } from "../ui/list.js";
-import { REFRESH_TOGGLE, toggleRefresh } from "../ui/refresh.js";
+import { getConnection, getDefaults, getWatches } from "../storage.js";
+import { connectionPillEl } from "../ui/controls.js";
+import { need } from "../ui/dom.js";
+import { mountEditor } from "../ui/editor.js";
+import { toDraft } from "../ui/form.js";
+import { openTabUrls } from "../ui/tab.js";
+import { connectionPill } from "../ui/text.js";
+import { renderSettings, renderSites, openTab } from "./settings.js";
+import { watchesContent } from "./watches.js";
 
-const ACTIONS: RowAction[] = [
-  { action: "edit", text: "Edit" },
-  { action: "test", text: "Send test blip" },
-  REFRESH_TOGGLE,
-  { action: "toggle", text: (watch) => (watch.enabled ? "Disable" : "Enable") },
-  { action: "delete", text: "Delete" },
-];
+type Route = "watches" | "settings";
 
-const form = need("#watch-form", HTMLFormElement);
-const list = need("#watches", HTMLElement);
-const errors = need("#form-errors", HTMLElement);
-const heading = need("#form-heading", HTMLElement);
-const result = need("#result", HTMLElement);
-const saveButton = need("#save", HTMLButtonElement);
-const SAVE_LABEL = saveButton.textContent;
-
-let editing: string | null = null;
+const panels: Record<Route, HTMLElement> = {
+  watches: need("#watches", HTMLElement),
+  settings: need("#settings", HTMLElement),
+};
+const tabs: Record<Route, HTMLElement> = {
+  watches: need("#tab-watches", HTMLElement),
+  settings: need("#tab-settings", HTMLElement),
+};
+const dialog = need("#edit-dialog", HTMLDialogElement);
+const editorRoot = need("#editor", HTMLElement);
+const conn = need("#conn", HTMLElement);
+let renders = 0;
 
 void main();
 
 async function main(): Promise<void> {
-  form.addEventListener("submit", onSubmit);
-  need("#cancel", HTMLElement).addEventListener("click", () => void reset());
-  list.addEventListener("click", (event) => void onAction(event));
-  browser.storage.onChanged.addListener(() => void refresh());
-  await reset();
-  await refresh();
+  window.addEventListener("hashchange", route);
+  route();
+  const rerender = () => void render();
+  browser.storage.onChanged.addListener(rerender);
+  browser.permissions.onAdded.addListener(rerender);
+  browser.permissions.onRemoved.addListener(rerender);
+  browser.tabs.onUpdated.addListener(rerender);
+  browser.tabs.onRemoved.addListener(rerender);
+  dialog.addEventListener("close", () => {
+    editorRoot.replaceChildren();
+  });
+  await render();
 }
 
-const saving = onceAtATime(async () => {
-  setSaving(true);
-  try {
-    await save(draftFrom(readForm(form), editing ?? undefined));
-  } finally {
-    setSaving(false);
+function route(): void {
+  const current: Route = location.hash === "#settings" ? "settings" : "watches";
+  for (const name of ["watches", "settings"] as const) {
+    panels[name].hidden = name !== current;
+    if (name === current) tabs[name].setAttribute("aria-current", "page");
+    else tabs[name].removeAttribute("aria-current");
   }
-});
-
-function onSubmit(event: Event): void {
-  event.preventDefault();
-  if (saving.busy) return;
-  const problems = validate(draftFrom(readForm(form), editing ?? undefined));
-  listErrors(errors, problems);
-  // The gesture must reach `permissions.request`, so nothing is awaited before save().
-  if (problems.length === 0) void saving.run();
+  need("#page-title", HTMLElement).textContent = current === "settings" ? "Settings" : "Watches";
 }
 
-function setSaving(active: boolean): void {
-  saveButton.disabled = active;
-  saveButton.textContent = active ? "Saving…" : SAVE_LABEL;
+async function render(): Promise<void> {
+  const ticket = (renders += 1);
+  const [watches, defaults, check, openUrls] = await Promise.all([
+    getWatches(),
+    getDefaults(),
+    getConnection(),
+    openTabUrls(),
+  ]);
+  if (ticket !== renders) return;
+  const pill = connectionPillEl(connectionPill(check, defaults.server ?? DEFAULT_SERVER));
+  conn.replaceChildren(...(pill ? [pill] : []));
+  const key =
+    document.activeElement instanceof HTMLElement ? document.activeElement.dataset.key : undefined;
+  panels.watches.replaceChildren(
+    ...watchesContent(watches, openUrls, {
+      onEdit: (watch) => void edit(watch),
+      onOpenSite: (url) => void openTab(url),
+    }),
+  );
+  if (key) panels.watches.querySelector<HTMLElement>(`[data-key="${key}"]`)?.focus();
+  renderSettings(defaults, check);
+  await renderSites(watches, openUrls);
 }
 
-async function save(draft: WatchDraft): Promise<void> {
-  const access = await requestAccess(draft.urlPattern);
-  if ("error" in access) {
-    show(result, access.error, "bad");
-    return;
-  }
-  const outcome = await send({ kind: "saveWatch", draft });
-  if ("error" in outcome) {
-    show(result, outcome.error, "bad");
-    return;
-  }
-  show(result, "Watch saved.", "good");
-  await reset();
-  await refresh();
+async function edit(watch: Watch): Promise<void> {
+  const defaults = await getDefaults();
+  const close = () => {
+    dialog.close();
+  };
+  mountEditor(
+    editorRoot,
+    {
+      pickable: false,
+      markSrc: "../icons/blipr-mark.svg",
+      count: (selector, containsText) => countOnOpenTab(watch.urlPattern, selector, containsText),
+      onBack: close,
+      onSaved: close,
+      onDeleted: close,
+    },
+    { draft: toDraft(watch), defaults },
+  );
+  if (!dialog.open) dialog.showModal();
 }
 
-async function onAction(event: Event): Promise<void> {
-  const hit = rowAction(event);
-  if (!hit) return;
-  await run(hit.action, hit.id);
-  await refresh();
-}
-
-async function run(action: string, id: string): Promise<void> {
-  const watch = await getWatch(id);
-  if (!watch) return;
-  switch (action) {
-    case "edit":
-      edit(watch);
-      return;
-    case "test":
-      return test(watch);
-    case "refresh":
-      return toggleRefresh(watch);
-    case "delete":
-      return confirmDelete(watch);
-    case "toggle":
-      // Switching one back on starts it watching from here, not from what is already on the page.
-      await patchWatch(
-        id,
-        watch.enabled ? { enabled: false } : { enabled: true, watchingSince: Date.now() },
-      );
-  }
-}
-
-function edit(watch: Watch): void {
-  editing = watch.id;
-  fillForm(form, toDraft(watch));
-  heading.textContent = "Edit watch";
-  form.scrollIntoView({ behavior: "smooth" });
-}
-
-async function confirmDelete(watch: Watch): Promise<void> {
-  if (!confirm(`Delete the watch on ${watch.topic}?`)) return;
-  await deleteWatch(watch.id);
-  if (editing === watch.id) await reset();
-}
-
-async function test(watch: Watch): Promise<void> {
-  const outcome = await send({ kind: "testWatch", draft: toDraft(watch) });
-  if ("error" in outcome) show(result, outcome.error, "bad");
-  else show(result, "Test blip sent. Check your phone.", "good");
-}
-
-async function refresh(): Promise<void> {
-  renderList(list, await getWatches(), { actions: ACTIONS });
-}
-
-async function reset(): Promise<void> {
-  editing = null;
-  heading.textContent = "Add a watch";
-  listErrors(errors, []);
-  fillForm(form, blankDraft(await getDefaults(), ""));
+/** The options page has no page of its own, so it counts on an open tab of the watch's site. */
+async function countOnOpenTab(
+  urlPattern: string,
+  selector: string,
+  containsText: string,
+): Promise<number | null> {
+  const tabs = await browser.tabs.query({}).catch(() => []);
+  const tab = tabs.find((each) => each.id !== undefined && matchesUrl(urlPattern, each.url ?? ""));
+  if (tab?.id === undefined) return null;
+  const counted = await send({ kind: "countMatches", tabId: tab.id, selector, containsText }).catch(
+    () => null,
+  );
+  return counted && "matches" in counted ? counted.matches : null;
 }

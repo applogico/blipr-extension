@@ -5,6 +5,7 @@ import browser from "webextension-polyfill";
 
 import type { Watch, WatchDraft } from "./core/watch.js";
 import type { SelectorPick } from "./core/selector.js";
+import type { ConnectionCheck } from "./storage.js";
 
 export type Message =
   /** Content script asks which watches apply to the page it is running on. */
@@ -24,7 +25,9 @@ export type Message =
   /** Save a watch, requesting host access for its origin first. */
   | { kind: "saveWatch"; draft: WatchDraft }
   /** Publish once, without touching the watch's cooldown or fire-once state. */
-  | { kind: "testWatch"; draft: WatchDraft };
+  | { kind: "testWatch"; draft: WatchDraft }
+  /** Ask the server whether it is there, and remember the answer for the popup. */
+  | { kind: "checkConnection"; server: string };
 
 export type Responses = {
   watchesForUrl: Array<
@@ -38,6 +41,7 @@ export type Responses = {
   countMatches: { matches: number } | { error: string };
   saveWatch: { saved: Watch } | { error: string };
   testWatch: { ok: true } | { error: string };
+  checkConnection: ConnectionCheck;
 };
 
 type OfKind<K extends Message["kind"]> = Extract<Message, { kind: K }>;

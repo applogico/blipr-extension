@@ -85,26 +85,26 @@ describe("fire", () => {
   });
 
   it("drops a blip inside the cooldown, and says so on the watch", async () => {
-    await fire({ ...watch, cooldownSeconds: 5, lastFiredAt: Date.now() - 1_000 }, occasion);
+    await fire({ ...watch, cooldownSeconds: 30, lastFiredAt: Date.now() - 1_000 }, occasion);
     expect(mocks.publish).not.toHaveBeenCalled();
     expect(patches()).toEqual([{ lastSuppressedAt: expect.any(Number) as number }]);
   });
 
   it("blips the next transition once the window has passed", async () => {
-    await fire({ ...watch, cooldownSeconds: 5, lastFiredAt: Date.now() - 6_000 }, occasion);
+    await fire({ ...watch, cooldownSeconds: 30, lastFiredAt: Date.now() - 31_000 }, occasion);
     expect(mocks.publish).toHaveBeenCalledTimes(1);
   });
 
-  it("blips every transition when the cooldown is off", async () => {
-    await fire({ ...watch, cooldownSeconds: 0, lastFiredAt: Date.now() }, occasion);
-    expect(mocks.publish).toHaveBeenCalledTimes(1);
+  it("never blips faster than the ten second floor, even for a stored zero", async () => {
+    await fire({ ...watch, cooldownSeconds: 0, lastFiredAt: Date.now() - 5_000 }, occasion);
+    expect(mocks.publish).not.toHaveBeenCalled();
   });
 
   it("holds a watch saved before cooldowns existed to the default, not to a minute", async () => {
     await fire({ ...watch, lastFiredAt: Date.now() - 1_000 }, occasion);
     expect(mocks.publish).not.toHaveBeenCalled();
 
-    await fire({ ...watch, lastFiredAt: Date.now() - 6_000 }, occasion);
+    await fire({ ...watch, lastFiredAt: Date.now() - 11_000 }, occasion);
     expect(mocks.publish).toHaveBeenCalledTimes(1);
   });
 

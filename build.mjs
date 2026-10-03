@@ -64,6 +64,7 @@ async function buildTarget(target) {
   else await esbuild.build(options);
 
   await cp(join(root, "icons"), join(outdir, "icons"), { recursive: true });
+  await cp(join(root, "src/ui/theme.css"), join(outdir, "ui/theme.css"));
   for (const page of ["popup", "options"]) {
     await cp(join(root, `src/${page}/${page}.html`), join(outdir, `${page}/${page}.html`));
     await cp(join(root, `src/${page}/${page}.css`), join(outdir, `${page}/${page}.css`));

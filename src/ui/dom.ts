@@ -6,11 +6,17 @@ export function need<T extends Element>(selector: string, type: new () => T): T 
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  props: Partial<HTMLElementTagNameMap[K]>,
-  children: Node[] = [],
+  props: Partial<HTMLElementTagNameMap[K]> = {},
+  children: Array<Node | string> = [],
 ): HTMLElementTagNameMap[K] {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children);
+  return node;
+}
+
+/** Attributes `el` cannot set as properties: roles, aria and data. */
+export function attrs<T extends Element>(node: T, values: Record<string, string>): T {
+  for (const [name, value] of Object.entries(values)) node.setAttribute(name, value);
   return node;
 }
 
