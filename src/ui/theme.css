@@ -913,6 +913,34 @@ input.input:focus-visible {
   gap: 18px;
 }
 
+.foot.more-below::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -28px;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--surface-background));
+  pointer-events: none;
+}
+
+.end-sentinel {
+  height: 1px;
+  margin-top: -18px;
+}
+
+.server-line .link-btn {
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-link);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .foot {
   position: sticky;
   bottom: 0;

@@ -6,7 +6,15 @@ import { PRIORITY_CHOICES, segmented, switchButton } from "./controls.js";
 import { el } from "./dom.js";
 import type { Editor } from "./editor.js";
 import type { Screen } from "./editor-parts.js";
-import { field, hidden, hint, screenHeader, switchRow, textInput } from "./editor-parts.js";
+import {
+  field,
+  hidden,
+  hint,
+  screenHeader,
+  serverLine,
+  switchRow,
+  textInput,
+} from "./editor-parts.js";
 import { REFRESH_BOUNDS, withRefresh } from "./form.js";
 import { openableUrl, pagesSummary, wholeSitePattern } from "./sites.js";
 import { stepper } from "./stepper.js";
@@ -28,6 +36,7 @@ function more(editor: Editor): HTMLElement[] {
       pagesRow(editor),
     ]),
     previewField(editor),
+    serverLine(editor.draft.server, editor.ctx.onOpenSettings),
   ]);
   return [screenHeader("More options", back), body];
 }

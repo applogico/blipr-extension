@@ -13,7 +13,7 @@ import { attrs, el, listErrors, show } from "./dom.js";
 import { cleanDraft, shouldRememberTopic } from "./form.js";
 import { moreScreen } from "./editor-more.js";
 import type { Field, Screen } from "./editor-parts.js";
-import { field, screenHeader, textInput } from "./editor-parts.js";
+import { field, screenHeader, serverLine, textInput } from "./editor-parts.js";
 import { segmented } from "./controls.js";
 import { filteredLine, matchesOnPage, moreSummary, plural } from "./text.js";
 
@@ -27,6 +27,8 @@ export type EditorContext = {
   onPickAgain?: (draft: WatchDraft) => void;
   onChange?: (draft: WatchDraft) => void;
   onBack: () => void;
+  /** Opens Settings; the draft is already stashed by onChange, so nothing is lost. */
+  onOpenSettings?: () => void;
   onSaved: (watch: Watch) => void;
   onDeleted: () => void;
 };
@@ -40,6 +42,25 @@ export type EditorStart = {
 type PickChoice = { label: string; selector: string; small: string };
 
 const COUNT_DELAY_MS = 250;
+
+/**
+ * Fades the top of the sticky footer while part of the form is hidden under it,
+ * so a long form reads as scrollable. A sentinel at the end of the body tells.
+ */
+export function cueWhenMoreBelow(body: HTMLElement, footer: HTMLElement): void {
+  const sentinel = el("div", { className: "end-sentinel" });
+  body.append(sentinel);
+  // Measured after layout, so the margin matches the footer that covers the end of the form.
+  requestAnimationFrame(() => {
+    const height = Math.ceil(footer.getBoundingClientRect().height);
+    new IntersectionObserver(
+      ([entry]) => {
+        footer.classList.toggle("more-below", entry ? !entry.isIntersecting : false);
+      },
+      { rootMargin: `0px 0px -${height}px 0px` },
+    ).observe(sentinel);
+  });
+}
 
 export function mountEditor(root: HTMLElement, ctx: EditorContext, start: EditorStart): void {
   new Editor(root, ctx, start).open("main");
@@ -110,12 +131,14 @@ export class Editor {
       ...(this.editing ? [this.deleteButton()] : []),
     ]);
     const title = this.editing ? "Edit watch" : "New watch";
+    const footer = this.footer();
+    cueWhenMoreBelow(body, footer);
     return [
       screenHeader(title, () => {
         this.ctx.onBack();
       }),
       body,
-      this.footer(),
+      footer,
     ];
   }
 
@@ -219,7 +242,9 @@ export class Editor {
       el("label", { className: "label", htmlFor: input.id, textContent: "Send to topic" }),
       el("div", { className: "input" }, [input, suffix]),
     ];
-    if (!this.defaults.topic) parts.push(...this.firstTopicParts());
+    if (!this.defaults.topic) {
+      parts.push(...this.firstTopicParts(), serverLine(this.draft.server, this.ctx.onOpenSettings));
+    }
     return field(parts);
   }
 

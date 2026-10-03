@@ -1,4 +1,5 @@
 import { attrs, el } from "./dom.js";
+import { hostOfServer } from "./text.js";
 
 export type Screen = "main" | "more" | "pages";
 export type Field = HTMLElement;
@@ -21,6 +22,21 @@ export function textInput(
 
 export function field(children: HTMLElement[]): HTMLElement {
   return el("div", { className: "field" }, children);
+}
+
+/** "Sending to blipr.dev. Change": where blips go, with a way to Settings when the host offers one. */
+export function serverLine(server: string, onOpenSettings?: () => void): HTMLElement {
+  const line = el("p", { className: "hint server-line" }, [`Sending to ${hostOfServer(server)}.`]);
+  if (onOpenSettings) {
+    const change = el("button", {
+      type: "button",
+      className: "link-btn",
+      textContent: "Change in Settings",
+    });
+    change.addEventListener("click", onOpenSettings);
+    line.append(" ", change);
+  }
+  return line;
 }
 
 export function screenHeader(title: string, onBack: () => void): HTMLElement {

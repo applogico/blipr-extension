@@ -60,12 +60,15 @@ const ACTIONS: HomeActions = {
 
 void main();
 
-async function main(): Promise<void> {
-  need("#settings", HTMLElement).addEventListener("click", () => {
-    void openOptions("settings").then(() => {
-      window.close();
-    });
+/** The draft is already stashed per tab, so the editor comes back as it was. */
+function openSettings(): void {
+  void openOptions("settings").then(() => {
+    window.close();
   });
+}
+
+async function main(): Promise<void> {
+  need("#settings", HTMLElement).addEventListener("click", openSettings);
   page = await activeTab();
   defaults = await getDefaults();
   browser.storage.onChanged.addListener(() => void onStorage());
@@ -149,6 +152,7 @@ function openEditor(draft: WatchDraft, pick: SelectorPick | null = null): void {
       onBack: () => {
         leave(null);
       },
+      onOpenSettings: openSettings,
       onSaved: (watch: Watch) => {
         leave(savedToast(watch.selector));
       },
