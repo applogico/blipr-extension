@@ -4,7 +4,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-const needed = ["EXTENSION_ID", "CLIENT_ID", "CLIENT_SECRET", "REFRESH_TOKEN"];
+const needed = ["PUBLISHER_ID", "EXTENSION_ID", "CLIENT_ID", "CLIENT_SECRET", "REFRESH_TOKEN"];
 const missing = needed.filter((name) => !process.env[name]);
 if (missing.length > 0) {
   console.log(`Chrome Web Store upload skipped: ${missing.join(", ")} not set.`);

@@ -105,11 +105,12 @@ them at runtime, and the manifest for each is generated from `src/manifest.ts`.
 
 Every push to `main` runs semantic-release: a `fix:` or `feat:` commit since the last tag cuts a
 GitHub release with both zips attached, then uploads the Chrome zip to the Chrome Web Store and
-submits it for review. The store step needs four repository secrets and skips itself with a note
+submits it for review. The store step needs five repository secrets and skips itself with a note
 when they are absent:
 
 | Secret              | Where it comes from                                                                 |
 | ------------------- | ----------------------------------------------------------------------------------- |
+| `CWS_PUBLISHER_ID`  | Your publisher ID, on the Account page of the Chrome Web Store developer dashboard. |
 | `CWS_EXTENSION_ID`  | The id in the store listing URL.                                                    |
 | `CWS_CLIENT_ID`     | A Google Cloud OAuth client (Desktop app) with the Chrome Web Store API enabled.    |
 | `CWS_CLIENT_SECRET` | Same client.                                                                        |

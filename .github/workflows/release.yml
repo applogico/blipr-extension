@@ -36,6 +36,7 @@ jobs:
       - run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
           EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
           CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
