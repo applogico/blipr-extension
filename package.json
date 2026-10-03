@@ -22,15 +22,15 @@
     "@semantic-release/exec": "^7.1.0",
     "@types/webextension-polyfill": "^0.12.1",
     "chrome-webstore-upload-cli": "4.0.1",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9.15.0",
     "jsdom": "^25.0.1",
     "prettier": "^3.4.1",
     "semantic-release": "^25.0.9",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.16.0",
-    "vitest": "^2.1.6",
-    "web-ext": "^8.3.0"
+    "vitest": "^4.1.11",
+    "web-ext": "^10.7.0"
   },
   "dependencies": {
     "@blipr/js": "^0.1.0",
