@@ -23,6 +23,7 @@ export type Snapshot = {
 
 export type HomeActions = {
   onPick: () => void;
+  onPaste: () => void;
   onOpenWatch: (watch: Watch) => void;
   onToggleGroup: (open: boolean) => void;
   onSeeAll: () => void;
@@ -32,7 +33,8 @@ export function homeContent(snap: Snapshot, actions: HomeActions): HTMLElement[]
   const top = [...offline(snap), ...toast(snap)];
   const { page } = snap;
   if (!page?.watchable) return [...top, blocked(), ...blockedGroup(snap, actions)];
-  if (snap.watches.length === 0) return [...top, firstRun(), pickButton(actions)];
+  if (snap.watches.length === 0)
+    return [...top, firstRun(), pickButton(actions), pasteLink(actions)];
   const here = snap.watches.filter((watch) => matchesUrl(watch.urlPattern, page.url));
   const others = snap.watches.filter((watch) => !here.includes(watch));
   const open = snap.othersOpen ?? here.length === 0;
@@ -40,6 +42,7 @@ export function homeContent(snap: Snapshot, actions: HomeActions): HTMLElement[]
     ...top,
     onThisPage(page, here, snap, actions),
     pickButton(actions),
+    pasteLink(actions),
     ...(others.length === 0 ? [] : [group("Other watches", others, open, snap, actions)]),
   ];
 }
@@ -92,6 +95,17 @@ function pickButton(actions: HomeActions): HTMLElement {
   });
   button.addEventListener("click", actions.onPick);
   return button;
+}
+
+/** Quiet, under the main button: picking stays the obvious first step. */
+function pasteLink(actions: HomeActions): HTMLElement {
+  const button = el("button", {
+    type: "button",
+    className: "link",
+    textContent: "Paste a shared watch",
+  });
+  button.addEventListener("click", actions.onPaste);
+  return el("div", { className: "paste-link" }, [button]);
 }
 
 function onThisPage(

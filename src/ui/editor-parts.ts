@@ -39,12 +39,13 @@ export function serverLine(server: string, onOpenSettings?: () => void): HTMLEle
   return line;
 }
 
-export function screenHeader(title: string, onBack: () => void): HTMLElement {
+export function screenHeader(title: string, onBack: () => void, action?: HTMLElement): HTMLElement {
   const back = el("button", { type: "button", className: "iconbtn", textContent: "Back" });
   back.addEventListener("click", onBack);
   return el("header", { className: "screen-hd" }, [
     back,
     el("h1", { className: "brand grow", textContent: title }),
+    ...(action ? [action] : []),
   ]);
 }
 
