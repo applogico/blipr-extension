@@ -119,3 +119,32 @@ describe("shapeOf", () => {
     expect(shapeOf(q("section"))).toBe("section");
   });
 });
+
+describe("stable selectors on utility-class sites", () => {
+  it("skips classes with variants or arbitrary values", () => {
+    html(`<div class="flex"><span class="nd:max-h-[32px] w-1/2 sort">x</span></div>`);
+    expect(shapeOf(q("span"))).toBe("span.sort");
+  });
+
+  it("prefers an attribute the site set to name the element", () => {
+    html(
+      `<shreddit-post><a slot="title" class="block text-neutral-content-strong m-0">t</a></shreddit-post>`,
+    );
+    expect(shapeOf(q("a"))).toBe('a[slot="title"]');
+  });
+
+  it("takes data-testid over slot and classes", () => {
+    html(`<button data-testid="sort" slot="menu" class="btn">s</button>`);
+    expect(shapeOf(q("button"))).toBe('button[data-testid="sort"]');
+  });
+
+  it("generalizes on a naming attribute", () => {
+    html(`<div><a slot="title">a</a><a slot="title">b</a><a slot="title">c</a></div>`);
+    expect(similarSelector(nth("a", 1))).toBe('a[slot="title"]');
+  });
+
+  it("ignores an attribute value that would break the selector", () => {
+    html(`<div aria-label='say "hi"' class="card">x</div>`);
+    expect(shapeOf(q("div"))).toBe("div.card");
+  });
+});
