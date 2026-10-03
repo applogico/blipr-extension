@@ -4,6 +4,7 @@
 // only a user gesture is allowed to do.
 import browser from "webextension-polyfill";
 
+import { setPickBadge } from "../badge.js";
 import { isStale } from "../core/connection.js";
 import type { SelectorPick } from "../core/selector.js";
 import { matchesUrl, suggestPattern } from "../core/urlmatch.js";
@@ -20,6 +21,7 @@ import {
   setPrefs,
   stashDraft,
   takeDraft,
+  takePick,
 } from "../storage.js";
 import { requestAccess } from "../ui/access.js";
 import { connectionPillEl } from "../ui/controls.js";
@@ -69,8 +71,7 @@ function openSettings(): void {
 
 async function main(): Promise<void> {
   need("#settings", HTMLElement).addEventListener("click", openSettings);
-  page = await activeTab();
-  defaults = await getDefaults();
+  [page, defaults] = await Promise.all([activeTab(), getDefaults()]);
   browser.storage.onChanged.addListener(() => void onStorage());
   if (!(page?.watchable && (await resume(page)))) await renderHome();
   void checkIfStale();
@@ -84,10 +85,9 @@ async function onStorage(): Promise<void> {
 
 /** Picking, and a permission prompt on Chrome, both close the popup mid-edit. */
 async function resume(tab: PageTab): Promise<boolean> {
-  const [parked, pick] = await Promise.all([
-    takeDraft(tab.id),
-    send({ kind: "takePick", tabId: tab.id }).catch(() => null),
-  ]);
+  // Read here, not through the background, so a sleeping worker never delays the popup.
+  void setPickBadge(tab.id, false);
+  const [parked, pick] = await Promise.all([takeDraft(tab.id), takePick(tab.id)]);
   if (!parked && !pick) return false;
   const base = parked ?? blankDraft(defaults, suggestPattern(tab.url));
   openEditor(base, pick);
