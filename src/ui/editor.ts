@@ -3,6 +3,7 @@
 // only touches storage to save, delete, or remember a first topic.
 import { onceAtATime } from "../core/guard.js";
 import type { SelectorPick } from "../core/selector.js";
+import { matchesUrl } from "../core/urlmatch.js";
 import type { Condition, Watch, WatchDraft } from "../core/watch.js";
 import { validate } from "../core/watch.js";
 import { send } from "../messages.js";
@@ -15,6 +16,8 @@ import { moreScreen } from "./editor-more.js";
 import type { Field, Screen } from "./editor-parts.js";
 import { field, screenHeader, serverLine, textInput } from "./editor-parts.js";
 import { segmented } from "./controls.js";
+import { copiedCallout, copyWatch, flipCopied, offPageLine, sharedCallout } from "./share.js";
+import { siteOf } from "./sites.js";
 import { filteredLine, matchesOnPage, moreSummary, plural } from "./text.js";
 
 export type EditorContext = {
@@ -37,6 +40,8 @@ export type EditorStart = {
   draft: WatchDraft;
   defaults: WatchDefaults;
   pick?: SelectorPick | null;
+  /** Filled in from a pasted share, so the form says so and only counts on its own pages. */
+  shared?: boolean;
 };
 
 type PickChoice = { label: string; selector: string; small: string };
@@ -70,6 +75,7 @@ export class Editor {
   draft: WatchDraft;
   readonly defaults: WatchDefaults;
   readonly choices: PickChoice[];
+  readonly shared: boolean;
   useAsDefault = true;
   total: number | null = null;
   filtered: number | null = null;
@@ -86,6 +92,7 @@ export class Editor {
     start: EditorStart,
   ) {
     this.defaults = start.defaults;
+    this.shared = start.shared === true;
     this.choices = choicesOf(start.pick ?? null);
     const preferred = this.choices.at(-1);
     this.draft = preferred ? { ...start.draft, selector: preferred.selector } : start.draft;
@@ -116,10 +123,25 @@ export class Editor {
 
   private mainScreen(): HTMLElement[] {
     const body = el("div", { className: "screen-bd" }, [
+      ...(this.shared ? [sharedCallout()] : []),
       this.elementField(),
       this.conditionField(),
       this.topicField(),
       this.moreRow(),
+      ...this.mainTail(),
+    ]);
+    const title = this.editing ? "Edit watch" : "New watch";
+    const footer = this.footer();
+    cueWhenMoreBelow(body, footer);
+    const back = () => {
+      this.ctx.onBack();
+    };
+    const share = this.editing ? this.shareButton(body) : undefined;
+    return [screenHeader(title, back, share), body, footer];
+  }
+
+  private mainTail(): HTMLElement[] {
+    return [
       el("p", {
         className: "hint",
         textContent: "Blipr watches while this page is open in a tab. It can be in the background.",
@@ -129,17 +151,34 @@ export class Editor {
         "aria-live": "polite",
       }),
       ...(this.editing ? [this.deleteButton()] : []),
-    ]);
-    const title = this.editing ? "Edit watch" : "New watch";
-    const footer = this.footer();
-    cueWhenMoreBelow(body, footer);
-    return [
-      screenHeader(title, () => {
-        this.ctx.onBack();
-      }),
-      body,
-      footer,
     ];
+  }
+
+  /** Only a saved watch can be shared. */
+  private shareButton(body: HTMLElement): HTMLElement {
+    const button = el("button", {
+      type: "button",
+      className: "btn secondary sm",
+      textContent: "Share",
+    });
+    button.addEventListener("click", () => void this.share(button, body));
+    return button;
+  }
+
+  private async share(button: HTMLElement, body: HTMLElement): Promise<void> {
+    if (!(await copyWatch(cleanDraft(this.draft)))) {
+      this.result("Couldn't copy. Try again.", "bad");
+      return;
+    }
+    flipCopied(button, "Share", "✓ Copied");
+    body.querySelector(".callout.copied")?.remove();
+    body.prepend(copiedCallout());
+  }
+
+  /** A shared watch for another page is not counted here, where it would read zero. */
+  private wrongPage(): boolean {
+    const { pageUrl } = this.ctx;
+    return this.shared && pageUrl !== undefined && !matchesUrl(this.draft.urlPattern, pageUrl);
   }
 
   private elementField(): HTMLElement {
@@ -319,7 +358,7 @@ export class Editor {
     const { count } = this.ctx;
     const selector = this.draft.selector.trim();
     const text = this.draft.containsText?.trim() ?? "";
-    if (!count || selector === "") {
+    if (!count || selector === "" || this.wrongPage()) {
       this.total = null;
       this.filtered = null;
     } else {
@@ -333,11 +372,20 @@ export class Editor {
 
   private renderCounts(): void {
     const { count, filter } = this.live;
-    if (count) countLine(count, this.total === null ? null : matchesOnPage(this.total), this.total);
+    if (count) this.renderTotal(count);
     if (filter) {
       const { total, filtered } = this;
       const shown = total !== null && filtered !== null && !!this.draft.containsText?.trim();
       countLine(filter, shown ? filteredLine(filtered, total) : null, filtered);
+    }
+  }
+
+  private renderTotal(node: HTMLElement): void {
+    const { total } = this;
+    if (this.shared && (total === null || this.wrongPage())) {
+      offPage(node, siteOf(this.draft.urlPattern));
+    } else {
+      countLine(node, total === null ? null : matchesOnPage(total), total);
     }
   }
 
@@ -418,6 +466,12 @@ function countLine(node: HTMLElement, text: string | null, value: number | null)
   node.hidden = text === null;
   node.textContent = text ?? "";
   node.className = value === 0 ? "count warn" : "count";
+}
+
+function offPage(node: HTMLElement, host: string): void {
+  node.hidden = false;
+  node.textContent = offPageLine(host);
+  node.className = "warn-line";
 }
 
 /** A pick offers the one element and everything like it, and starts on everything. */

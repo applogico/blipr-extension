@@ -4,6 +4,7 @@ import type { Watch } from "../core/watch.js";
 import { calloutEl, dot, lineEl, priorityPill } from "../ui/controls.js";
 import { attrs, el } from "../ui/dom.js";
 import { watchSwitch } from "../ui/rows.js";
+import { copyWatch, flipCopied } from "../ui/share.js";
 import type { SiteGroup } from "../ui/sites.js";
 import { groupBySite, isOpen, openableUrl } from "../ui/sites.js";
 import { errorCallout, lastBlipLabel, optionsLine, plural, stateOf } from "../ui/text.js";
@@ -11,6 +12,7 @@ import { errorCallout, lastBlipLabel, optionsLine, plural, stateOf } from "../ui
 export type WatchesActions = {
   onEdit: (watch: Watch) => void;
   onOpenSite: (url: string) => void;
+  onPaste: () => void;
 };
 
 export function watchesContent(
@@ -18,13 +20,25 @@ export function watchesContent(
   openUrls: string[],
   actions: WatchesActions,
 ): HTMLElement[] {
-  if (watches.length === 0) return [empty()];
+  const paste = pasteBar(actions);
+  if (watches.length === 0) return [paste, empty()];
   const warning = errorCallout(watches);
   const now = Date.now();
   return [
+    paste,
     ...(warning ? [calloutEl("warn", warning)] : []),
     ...groupBySite(watches).map((group) => siteCard(group, openUrls, now, actions)),
   ];
+}
+
+function pasteBar(actions: WatchesActions): HTMLElement {
+  const button = el("button", {
+    type: "button",
+    className: "btn secondary",
+    textContent: "Paste a shared watch",
+  });
+  button.addEventListener("click", actions.onPaste);
+  return el("div", { className: "paste-bar" }, [button]);
 }
 
 function empty(): HTMLElement {
@@ -85,8 +99,8 @@ function openButton(url: string, site: string, actions: WatchesActions): HTMLEle
 }
 
 function columns(): HTMLElement {
-  const names = ["", "Element", "Topic", "Priority", "Last blip", "On"];
-  const classes = ["", "", "col-topic", "", "col-last", ""];
+  const names = ["", "Element", "Topic", "Priority", "Last blip", "On", ""];
+  const classes = ["", "", "col-topic", "", "col-last", "", ""];
   return attrs(
     el(
       "div",
@@ -121,5 +135,21 @@ function gridRow(watch: Watch, open: boolean, now: number, actions: WatchesActio
     priorityPill(watch.priority),
     el("span", { className: "sub col-last", textContent: lastBlipLabel(watch, now) }),
     watchSwitch(watch),
+    shareLink(watch),
   ]);
+}
+
+/** Copies straight away; the link says Copied for a moment. */
+function shareLink(watch: Watch): HTMLElement {
+  const button = attrs(el("button", { type: "button", className: "link share" }), {
+    "aria-label": `Share ${watch.selector}`,
+    "data-key": `share:${watch.id}`,
+  });
+  button.textContent = "Share";
+  button.addEventListener("click", () => {
+    void copyWatch(watch).then((copied) => {
+      flipCopied(button, "Share", copied ? "Copied" : "Couldn't copy");
+    });
+  });
+  return button;
 }

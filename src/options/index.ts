@@ -2,6 +2,8 @@
 // per watch. The two tabs are hash routes, so the popup can open either one.
 import browser from "webextension-polyfill";
 
+import type { SharedWatch } from "../core/share.js";
+import { importedDraft } from "../core/share.js";
 import { matchesUrl } from "../core/urlmatch.js";
 import type { Watch } from "../core/watch.js";
 import { DEFAULT_SERVER } from "../core/watch.js";
@@ -10,7 +12,8 @@ import { getConnection, getDefaults, getWatches } from "../storage.js";
 import { connectionPillEl } from "../ui/controls.js";
 import { need } from "../ui/dom.js";
 import { mountEditor } from "../ui/editor.js";
-import { toDraft } from "../ui/form.js";
+import { blankDraft, toDraft } from "../ui/form.js";
+import { pasteScreen } from "../ui/share.js";
 import { openTabUrls } from "../ui/tab.js";
 import { connectionPill } from "../ui/text.js";
 import { renderSettings, renderSites, openTab } from "./settings.js";
@@ -75,6 +78,7 @@ async function render(): Promise<void> {
     ...watchesContent(watches, openUrls, {
       onEdit: (watch) => void edit(watch),
       onOpenSite: (url) => void openTab(url),
+      onPaste: paste,
     }),
   );
   if (key) panels.watches.querySelector<HTMLElement>(`[data-key="${key}"]`)?.focus();
@@ -100,6 +104,40 @@ async function edit(watch: Watch): Promise<void> {
     { draft: toDraft(watch), defaults },
   );
   if (!dialog.open) dialog.showModal();
+}
+
+/** Paste and the form it leads to share the edit dialog, so saving works as it does for an edit. */
+function paste(): void {
+  const close = () => {
+    dialog.close();
+  };
+  editorRoot.replaceChildren(
+    ...pasteScreen({
+      inDialog: true,
+      onBack: close,
+      onContinue: (shared) => void editShared(shared),
+    }),
+  );
+  if (!dialog.open) dialog.showModal();
+}
+
+async function editShared(shared: SharedWatch): Promise<void> {
+  const defaults = await getDefaults();
+  const close = () => {
+    dialog.close();
+  };
+  mountEditor(
+    editorRoot,
+    {
+      pickable: false,
+      markSrc: "../icons/blipr-mark.svg",
+      count: (selector, containsText) => countOnOpenTab(shared.urlPattern, selector, containsText),
+      onBack: close,
+      onSaved: close,
+      onDeleted: close,
+    },
+    { draft: importedDraft(blankDraft(defaults, ""), shared), defaults, shared: true },
+  );
 }
 
 /** The options page has no page of its own, so it counts on an open tab of the watch's site. */

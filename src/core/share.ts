@@ -18,8 +18,8 @@ export const SHARE_LIMITS = {
   message: 2000,
 } as const;
 
-export const NOT_A_SHARE = "That isn't a shared Blipr watch. Copy the whole thing and try again.";
-export const TOO_LONG = "That's too long to be a shared watch.";
+export const NOT_A_SHARE = "This isn't a shared Blipr watch. Ask for it again, copied with Share.";
+export const TOO_LONG = "This is too long to be a shared watch.";
 
 /** The fields a share is built from: an allowlist, so a new Watch field never leaks by default. */
 export type Shareable = Pick<
@@ -189,7 +189,7 @@ function readFields(value: Record<string, unknown>): ParsedShare {
 }
 
 export function badField(what: string): string {
-  return `The ${what} in that shared watch isn't valid.`;
+  return `The ${what} in this shared watch isn't valid.`;
 }
 
 /** Control characters have no place in a one-line field, so they mark the input as bad. */

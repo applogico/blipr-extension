@@ -6,6 +6,7 @@ import browser from "webextension-polyfill";
 
 import { isStale } from "../core/connection.js";
 import type { SelectorPick } from "../core/selector.js";
+import { importedDraft } from "../core/share.js";
 import { matchesUrl, suggestPattern } from "../core/urlmatch.js";
 import type { Watch, WatchDraft } from "../core/watch.js";
 import { DEFAULT_SERVER } from "../core/watch.js";
@@ -26,6 +27,7 @@ import { connectionPillEl } from "../ui/controls.js";
 import { el, need, show } from "../ui/dom.js";
 import { mountEditor } from "../ui/editor.js";
 import { blankDraft, toDraft } from "../ui/form.js";
+import { pasteScreen } from "../ui/share.js";
 import type { PageTab } from "../ui/tab.js";
 import { activeTab, openOptions, openTabUrls } from "../ui/tab.js";
 import { connectionPill, savedToast } from "../ui/text.js";
@@ -48,6 +50,7 @@ let renders = 0;
 
 const ACTIONS: HomeActions = {
   onPick: startPickFromHome,
+  onPaste: showPaste,
   onOpenWatch: (watch) => {
     openEditor(toDraft(watch));
   },
@@ -130,7 +133,7 @@ function showHome(toast: string | null = null): void {
   void renderHome();
 }
 
-function openEditor(draft: WatchDraft, pick: SelectorPick | null = null): void {
+function openEditor(draft: WatchDraft, pick: SelectorPick | null = null, shared = false): void {
   if (!page) return;
   const tab = page;
   view = "editor";
@@ -144,7 +147,9 @@ function openEditor(draft: WatchDraft, pick: SelectorPick | null = null): void {
     editorRoot,
     {
       pageUrl: tab.url,
-      pickable: tab.watchable && (draft.id === undefined || matchesUrl(draft.urlPattern, tab.url)),
+      pickable:
+        tab.watchable &&
+        ((draft.id === undefined && !shared) || matchesUrl(draft.urlPattern, tab.url)),
       markSrc: MARK,
       count: (selector, containsText) => count(tab.id, selector, containsText),
       onPickAgain: startPick,
@@ -160,7 +165,27 @@ function openEditor(draft: WatchDraft, pick: SelectorPick | null = null): void {
         leave(null);
       },
     },
-    { draft, defaults, pick },
+    { draft, defaults, pick, shared },
+  );
+}
+
+function showPaste(): void {
+  const tab = page;
+  if (!tab) return;
+  view = "editor";
+  home.hidden = true;
+  editorRoot.hidden = false;
+  const base = blankDraft(defaults, suggestPattern(tab.url));
+  editorRoot.replaceChildren(
+    ...pasteScreen({
+      inDialog: false,
+      onBack: () => {
+        showHome();
+      },
+      onContinue: (shared) => {
+        openEditor(importedDraft(base, shared), null, true);
+      },
+    }),
   );
 }
 

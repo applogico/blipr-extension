@@ -1109,3 +1109,78 @@ input.input:focus-visible {
   margin: 0;
   min-width: 56px;
 }
+
+/* Share and paste */
+.btn.sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.btn.done,
+.link.done {
+  color: var(--text-good);
+}
+
+.btn.done {
+  background: var(--feedback-success-subtle);
+  border-color: var(--text-good);
+}
+
+.incl {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 6px 8px;
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.incl .y {
+  color: var(--text-good);
+  font-weight: 700;
+}
+
+.incl .n {
+  font-weight: 700;
+}
+
+.ta {
+  width: 100%;
+  min-height: 168px;
+  resize: vertical;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--control-border);
+  background: var(--surface-card);
+  padding: 10px 12px;
+  font: 12.5px/1.5 var(--font-mono);
+  color: var(--text-primary);
+}
+
+.ta:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.ta.bad {
+  border-color: var(--border-danger);
+}
+
+.paste-link {
+  display: flex;
+  justify-content: center;
+  margin-top: -10px;
+}
+
+.dialog-hd {
+  padding: 16px 20px;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--surface-separator);
+}
+
+.dialog-hd .brand {
+  margin: 0;
+  font-size: 17px;
+}
