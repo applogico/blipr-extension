@@ -9,8 +9,6 @@ import {
   cooldownSecondsOf,
 } from "./watch.js";
 
-export const SHARE_MARKER = "watch";
-export const SHARE_VERSION = 1;
 export const MAX_SHARE_CHARS = 20_000;
 export const SHARE_LIMITS = {
   urlPattern: 2048,
@@ -21,7 +19,6 @@ export const SHARE_LIMITS = {
 } as const;
 
 export const NOT_A_SHARE = "That isn't a shared Blipr watch. Copy the whole thing and try again.";
-export const FROM_NEWER = "That watch came from a newer Blipr. Update Blipr, then try again.";
 export const TOO_LONG = "That's too long to be a shared watch.";
 
 /** The fields a share is built from: an allowlist, so a new Watch field never leaks by default. */
@@ -59,8 +56,6 @@ export type ParsedShare = { shared: SharedWatch } | { error: string };
 
 export function shareWatch(watch: Shareable): string {
   const json = {
-    blipr: SHARE_MARKER,
-    version: SHARE_VERSION,
     urlPattern: watch.urlPattern,
     selector: watch.selector,
     ...(watch.containsText ? { textContains: watch.containsText } : {}),
@@ -78,12 +73,7 @@ export function shareWatch(watch: Shareable): string {
 export function parseShare(input: string): ParsedShare {
   if (input.length > MAX_SHARE_CHARS) return { error: TOO_LONG };
   const value = parseJson(unwrap(input));
-  if (!isPlainObject(value) || value.blipr !== SHARE_MARKER) return { error: NOT_A_SHARE };
-  const { version } = value;
-  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
-    return { error: NOT_A_SHARE };
-  }
-  if (version > SHARE_VERSION) return { error: FROM_NEWER };
+  if (!isPlainObject(value) || !looksLikeWatch(value)) return { error: NOT_A_SHARE };
   return readFields(value);
 }
 
@@ -179,6 +169,11 @@ const FIELDS: Field[] = [
   { json: "title", key: "title", what: "title", read: optionalText(SHARE_LIMITS.title) },
   { json: "message", key: "message", what: "message", read: optionalText(SHARE_LIMITS.message) },
 ];
+
+/** JSON with none of a watch's required fields is something else pasted by mistake. */
+function looksLikeWatch(value: Record<string, unknown>): boolean {
+  return FIELDS.some((field) => field.needed && Object.hasOwn(value, field.json));
+}
 
 function readFields(value: Record<string, unknown>): ParsedShare {
   const shared: Record<string, unknown> = {};

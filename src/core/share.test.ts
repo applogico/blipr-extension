@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { SharedWatch } from "./share.js";
 import {
-  FROM_NEWER,
   MAX_SHARE_CHARS,
   NOT_A_SHARE,
   SHARE_LIMITS,
@@ -63,8 +62,6 @@ function error(text: string): string | undefined {
 
 function share(extra: Record<string, unknown>): string {
   return JSON.stringify({
-    blipr: "watch",
-    version: 1,
     urlPattern: "https://example.com/*",
     selector: ".x",
     blipWhen: "gone",
@@ -73,12 +70,10 @@ function share(extra: Record<string, unknown>): string {
 }
 
 describe("shareWatch", () => {
-  it("writes readable, pretty-printed JSON with a marker and a version", () => {
+  it("writes readable, pretty-printed JSON that starts with the URL pattern", () => {
     const text = shareWatch(watch);
-    expect(text).toContain('\n  "blipr": "watch"');
+    expect(text.startsWith('{\n  "urlPattern": ')).toBe(true);
     expect(JSON.parse(text)).toEqual({
-      blipr: "watch",
-      version: 1,
       urlPattern: "https://example.com/builds/*",
       selector: ".status.done",
       textContains: "Passed",
@@ -119,8 +114,6 @@ describe("shareWatch", () => {
       shareWatch({ ...watch, containsText: "", title: "", message: "", refresh: false }),
     ) as object;
     expect(Object.keys(plain)).toEqual([
-      "blipr",
-      "version",
       "urlPattern",
       "selector",
       "blipWhen",
@@ -214,22 +207,15 @@ describe("parseShare, refusals", () => {
   });
 
   it("refuses JSON that is not an object", () => {
-    for (const bad of ["null", "42", '"watch"', "[]", '[{"blipr":"watch","version":1}]']) {
+    for (const bad of ["null", "42", '"watch"', "[]", '[{"urlPattern":"https://e.com/*"}]']) {
       expect(error(bad)).toBe(NOT_A_SHARE);
     }
   });
 
-  it("refuses a wrong or missing marker", () => {
-    expect(error(share({ blipr: "topic" }))).toBe(NOT_A_SHARE);
-    expect(error(share({ blipr: undefined }))).toBe(NOT_A_SHARE);
-    expect(error(share({ blipr: true }))).toBe(NOT_A_SHARE);
-  });
-
-  it("refuses a missing or nonsense version, and says so for a newer one", () => {
-    for (const version of [undefined, 0, -1, 1.5, "1", null]) {
-      expect(error(share({ version }))).toBe(NOT_A_SHARE);
+  it("refuses JSON objects that are not a watch", () => {
+    for (const bad of ["{}", '{"name":"x"}', '{"blipr":"watch","version":1}']) {
+      expect(error(bad)).toBe(NOT_A_SHARE);
     }
-    expect(error(share({ version: 2 }))).toBe(FROM_NEWER);
   });
 
   it("refuses input too long to be a share", () => {
@@ -336,6 +322,8 @@ describe("parseShare, unknown fields", () => {
         enabled: true,
         lastFiredAt: 1,
         refresh: true,
+        blipr: "watch",
+        version: 7,
         __proto__: { polluted: true },
         constructor: "x",
       }),
@@ -353,7 +341,7 @@ describe("parseShare, unknown fields", () => {
 
   it("does not pick up a pollution attempt written as raw JSON", () => {
     const raw =
-      '{"blipr":"watch","version":1,"urlPattern":"https://e.com/*","selector":".x","blipWhen":"gone","__proto__":{"priority":5}}';
+      '{"urlPattern":"https://e.com/*","selector":".x","blipWhen":"gone","__proto__":{"priority":5}}';
     expect(shared(raw).priority).toBeUndefined();
   });
 });
