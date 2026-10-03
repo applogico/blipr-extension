@@ -18,8 +18,6 @@ export type Message =
   | { kind: "armPicker"; tabId: number }
   /** Content script hands back what the user clicked. */
   | { kind: "pickResult"; tabId: number; pick: SelectorPick }
-  /** Popup reads and clears the pick stashed for its tab. */
-  | { kind: "takePick"; tabId: number }
   /** Popup or options counts what a selector matches on a tab right now. */
   | { kind: "countMatches"; tabId: number; selector: string; containsText: string }
   /** Save a watch, requesting host access for its origin first. */
@@ -37,7 +35,6 @@ export type Responses = {
   watchError: undefined;
   armPicker: undefined;
   pickResult: undefined;
-  takePick: SelectorPick | null;
   countMatches: { matches: number } | { error: string };
   saveWatch: { saved: Watch } | { error: string };
   testWatch: { ok: true } | { error: string };

@@ -17,10 +17,9 @@ import {
   patchWatch,
   putWatch,
   stashPick,
-  takePick,
   WATCHES,
 } from "../storage.js";
-import { setPickBadge } from "./badge.js";
+import { setPickBadge } from "../badge.js";
 import { TEST_BLIP, attempt, fire } from "./blip.js";
 import { checkConnection } from "./connection.js";
 import { onAlarm, scheduleRefreshes } from "./refresh.js";
@@ -54,11 +53,6 @@ onMessage({
     const id = sender.tab?.id ?? tabId;
     await stashPick(id, pick);
     await setPickBadge(id, true);
-  },
-
-  takePick: async ({ tabId }) => {
-    await setPickBadge(tabId, false);
-    return takePick(tabId);
   },
 
   countMatches: async ({ tabId, selector, containsText }) => {
