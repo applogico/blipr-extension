@@ -41,3 +41,14 @@ jobs:
           CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+
+      - name: Blip when the release fails
+        if: ${{ failure() }}
+        uses: applogico/blipr-action@v1
+        with:
+          topic: blipr-releases
+          title: "Blipr extension release failed"
+          message: "The release workflow failed. Check whether the store upload went through."
+          priority: 4
+          tags: x
+          click: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
