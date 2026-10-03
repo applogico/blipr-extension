@@ -16,7 +16,8 @@ if (!existsSync("dist/blipr-chrome.zip")) {
 }
 const result = spawnSync(
   "npx",
-  ["chrome-webstore-upload", "upload", "--source", "dist/blipr-chrome.zip", "--auto-publish"],
+  // No command uploads and submits for review; `upload` alone leaves a draft.
+  ["chrome-webstore-upload", "--source", "dist/blipr-chrome.zip"],
   { stdio: "inherit" },
 );
 process.exit(result.status ?? 1);
