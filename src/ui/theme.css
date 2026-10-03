@@ -60,6 +60,7 @@
   --accent-on-subtle: var(--color-brand-700);
   --feedback-warning-subtle: var(--color-amber-50);
   --feedback-danger-subtle: var(--color-red-50);
+  --feedback-success-subtle: var(--color-green-50);
   --feedback-info-subtle: var(--color-blue-50);
   --border-warning: var(--color-amber-300);
   --border-danger: var(--color-red-300);
@@ -126,6 +127,7 @@
     --accent-on-subtle: var(--color-brand-200);
     --feedback-warning-subtle: rgba(245, 158, 11, 0.16);
     --feedback-danger-subtle: rgba(239, 68, 68, 0.16);
+    --feedback-success-subtle: rgba(16, 185, 129, 0.16);
     --feedback-info-subtle: rgba(59, 130, 246, 0.16);
     --border-warning: rgba(245, 158, 11, 0.45);
     --border-danger: rgba(239, 68, 68, 0.45);

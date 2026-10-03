@@ -222,11 +222,15 @@ export function offlineCallout(check: ConnectionCheck): Callout {
   };
 }
 
-export function checkResultLine(check: ConnectionCheck): string {
+/** `justNow` is for the result of a check the person just asked for. */
+export function checkResultLine(check: ConnectionCheck, justNow = false): string {
   const host = hostOfServer(check.server);
-  return check.ok
-    ? `${host} answered at ${clock(check.at)}`
-    : `${host} didn't answer at ${clock(check.at)}`;
+  const when = justNow ? "just now" : `at ${clock(check.at)}`;
+  return check.ok ? `${host} answered ${when}` : `${host} didn't answer ${when}`;
+}
+
+export function checkingLine(server: string): string {
+  return `Checking ${hostOfServer(server)}…`;
 }
 
 /** The Watches tab's warning, when any watch has an error. */

@@ -4,6 +4,7 @@ import type { Watch } from "../core/watch.js";
 import {
   ago,
   checkResultLine,
+  checkingLine,
   connectionPill,
   errorCallout,
   errorWords,
@@ -175,6 +176,9 @@ describe("connection", () => {
 
   it("words the check result and the offline callout", () => {
     expect(checkResultLine(ok)).toBe("blipr.dev answered at 13:52");
+    expect(checkResultLine(ok, true)).toBe("blipr.dev answered just now");
+    expect(checkResultLine(down, true)).toBe("blipr.dev didn't answer just now");
+    expect(checkingLine("https://blipr.dev")).toBe("Checking blipr.dev…");
     expect(offlineCallout(down)).toEqual({
       strong: "Blipr can't reach blipr.dev.",
       rest: "Watches keep watching, but blips can't be sent until the connection is back. Last answer at 13:41.",

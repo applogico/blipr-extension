@@ -19,7 +19,7 @@ import { PRIORITY_CHOICES, dot, lineEl, segmented } from "../ui/controls.js";
 import { attrs, el, need } from "../ui/dom.js";
 import { isOpen, openableUrl, siteOf } from "../ui/sites.js";
 import { stepper } from "../ui/stepper.js";
-import { checkResultLine, siteAccessLine } from "../ui/text.js";
+import { checkResultLine, checkingLine, siteAccessLine } from "../ui/text.js";
 
 const COOLDOWN_BOUNDS = {
   min: MIN_COOLDOWN_SECONDS,
@@ -70,27 +70,39 @@ function wire(defaults: WatchDefaults): void {
   );
 }
 
-function renderCheck(check: ConnectionCheck | null): void {
+// Long enough to read "Checking", so a fast answer still looks like something happened.
+const MIN_CHECK_MS = 700;
+
+function renderCheck(check: ConnectionCheck | null, justNow = false): void {
   if (!check) {
     checkResult.replaceChildren();
     return;
   }
   checkResult.replaceChildren(
-    el("span", { className: check.ok ? "ok" : "ok bad" }, [
+    el("span", { className: `${check.ok ? "ok" : "ok bad"}${justNow ? " fresh" : ""}` }, [
       dot(check.ok ? "on" : "error"),
-      checkResultLine(check),
+      checkResultLine(check, justNow),
     ]),
   );
 }
 
 async function check(): Promise<void> {
   const button = need("#check", HTMLButtonElement);
+  const target = server.value.trim() || DEFAULT_SERVER;
+  const label = button.textContent;
   button.disabled = true;
+  button.textContent = "Checking…";
+  checkResult.replaceChildren(
+    el("span", { className: "ok pending" }, [dot("paused"), checkingLine(target)]),
+  );
   try {
-    renderCheck(
-      await send({ kind: "checkConnection", server: server.value.trim() || DEFAULT_SERVER }),
-    );
+    const [result] = await Promise.all([
+      send({ kind: "checkConnection", server: target }),
+      new Promise((resolve) => setTimeout(resolve, MIN_CHECK_MS)),
+    ]);
+    renderCheck(result, true);
   } finally {
+    button.textContent = label;
     button.disabled = false;
   }
 }

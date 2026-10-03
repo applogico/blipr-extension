@@ -119,6 +119,34 @@ main {
   color: var(--text-bad);
 }
 
+.ok.pending {
+  color: var(--text-secondary);
+}
+
+/* A just-finished check pops in, so a fast answer still reads as new. */
+.ok.fresh {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--feedback-success-subtle);
+}
+
+.ok.bad.fresh {
+  background: var(--feedback-danger-subtle);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ok.fresh {
+    animation: check-in 320ms cubic-bezier(0.2, 0, 0, 1);
+  }
+}
+
+@keyframes check-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
 .site-card {
   overflow: hidden;
 }
