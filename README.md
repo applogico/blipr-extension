@@ -95,6 +95,23 @@ npm run package     # zips for the stores
 The two `dist/` trees are complete, independently loadable extensions. Nothing is shared between
 them at runtime, and the manifest for each is generated from `src/manifest.ts`.
 
+## Release
+
+Every push to `main` runs semantic-release: a `fix:` or `feat:` commit since the last tag cuts a
+GitHub release with both zips attached, then uploads the Chrome zip to the Chrome Web Store and
+submits it for review. The store step needs four repository secrets and skips itself with a note
+when they are absent:
+
+| Secret              | Where it comes from                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `CWS_EXTENSION_ID`  | The id in the store listing URL.                                                    |
+| `CWS_CLIENT_ID`     | A Google Cloud OAuth client (Desktop app) with the Chrome Web Store API enabled.    |
+| `CWS_CLIENT_SECRET` | Same client.                                                                        |
+| `CWS_REFRESH_TOKEN` | One-time consent flow for that client, see the `chrome-webstore-upload-cli` README. |
+
+Google still reviews each upload; the listing updates when review passes. Firefox is not automated
+yet: upload `dist/blipr-firefox.zip` to addons.mozilla.org by hand.
+
 ## Site access
 
 Blipr installs with no access to any website. Each watch asks for its own origin when you save it,

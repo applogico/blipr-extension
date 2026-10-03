@@ -30,6 +30,13 @@ jobs:
       # Only reached when a release is actually due: semantic-release writes
       # the resolved version into package.json, runs `npm run package` so the
       # built manifests carry it, then uploads the two zips onto the release.
+      # After the GitHub release: upload the Chrome zip to the Web Store and
+      # submit it for review. Skipped with a note when the store secrets are
+      # not set, so a release never fails on the store step.
       - run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
