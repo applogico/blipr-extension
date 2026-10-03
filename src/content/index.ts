@@ -7,7 +7,8 @@ import type { EdgeState } from "../core/edges.js";
 import { GRACE_MS, createdState, initialState, step } from "../core/edges.js";
 import { tryCount } from "../core/selector.js";
 import type { Watch } from "../core/watch.js";
-import { onMessage, send } from "../messages.js";
+import type { Message, OfKind, Responses } from "../messages.js";
+import { onMessage, send as sendRaw } from "../messages.js";
 import { DOM_CHANGES } from "./observe.js";
 import { arm } from "./picker.js";
 
@@ -122,6 +123,35 @@ function inspect(watch: LiveWatch): void {
  * screen then. Measured against the page, not against this script: saving the
  * first watch for a site is what injects the script in the first place.
  */
+/**
+ * An extension update or reload leaves this script running in already-open tabs,
+ * cut off from the extension: any message then throws "Extension context
+ * invalidated". Stop watching quietly instead; the new version injects its own.
+ */
+function send<K extends Message["kind"]>(message: OfKind<K>): Promise<Responses[K]> {
+  if (!browser.runtime.id) {
+    retire();
+    return Promise.reject(new Error("orphaned"));
+  }
+  try {
+    return sendRaw(message);
+  } catch (error) {
+    retire();
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+function retire(): void {
+  stop();
+  if (debounce !== null) clearTimeout(debounce);
+  if (settle !== null) clearTimeout(settle);
+  debounce = null;
+  settle = null;
+  watches = [];
+  // Lets the next version's injection start on this page.
+  (globalThis as unknown as Record<string, unknown>).__bliprContent = false;
+}
+
 function seedFor(watch: LiveWatch, matches: number): EdgeState {
   const since = watch.watchingSince ?? 0;
   return since > openedAt ? createdState(watch.condition, matches) : initialState();

@@ -44,7 +44,7 @@ export type Responses = {
   checkConnection: ConnectionCheck;
 };
 
-type OfKind<K extends Message["kind"]> = Extract<Message, { kind: K }>;
+export type OfKind<K extends Message["kind"]> = Extract<Message, { kind: K }>;
 
 export function send<K extends Message["kind"]>(message: OfKind<K>): Promise<Responses[K]> {
   return browser.runtime.sendMessage(message);
