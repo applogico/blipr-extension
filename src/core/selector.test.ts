@@ -148,3 +148,14 @@ describe("stable selectors on utility-class sites", () => {
     expect(shapeOf(q("div"))).toBe("div.card");
   });
 });
+
+describe("text inside shadow roots", () => {
+  it("counts a label that lives in an open shadow root", () => {
+    html(`<shreddit-sort-dropdown></shreddit-sort-dropdown>`);
+    const host = q("shreddit-sort-dropdown");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>.x{}</style><button>Best</button>`;
+    expect(tryCount(document, "shreddit-sort-dropdown", "Best")).toEqual({ matches: 1 });
+    expect(tryCount(document, "shreddit-sort-dropdown", "Hot")).toEqual({ matches: 0 });
+  });
+});

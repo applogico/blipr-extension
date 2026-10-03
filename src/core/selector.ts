@@ -148,7 +148,30 @@ export function tryCount(
 }
 
 /** `innerText` is what a reader sees. jsdom has none, where textContent is close enough. */
-function visibleText(el: Element): string {
+function ownText(el: Element): string {
   if ("innerText" in el && typeof el.innerText === "string") return el.innerText;
   return el.textContent;
+}
+
+const MAX_SHADOW_NODES = 200;
+
+/**
+ * What a reader sees, including inside open shadow roots: on web-component sites
+ * (Reddit's sort menu) the visible label lives there and `innerText` is empty.
+ */
+export function visibleText(el: Element): string {
+  const parts = [ownText(el)];
+  let budget = MAX_SHADOW_NODES;
+  const visit = (node: Element): void => {
+    if (budget <= 0) return;
+    budget -= 1;
+    for (const child of Array.from(node.shadowRoot?.children ?? [])) {
+      if (child.tagName === "STYLE" || child.tagName === "SLOT") continue;
+      parts.push(ownText(child));
+      visit(child);
+    }
+    for (const child of Array.from(node.children)) visit(child);
+  };
+  visit(el);
+  return parts.join(" ").replace(/\s+/g, " ").trim();
 }
