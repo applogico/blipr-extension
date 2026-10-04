@@ -22,7 +22,7 @@ jobs:
           # semantic-release reads the whole history and every tag to work out
           # the last release.
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
