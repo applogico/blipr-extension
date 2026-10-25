@@ -102,10 +102,10 @@ describe("publish", () => {
 
   it("refuses a topic it cannot address without sending anything", async () => {
     const fetchImpl = responding(200);
-    const result = await publish({ ...draft, topic: "@alice/tickets" }, blip, fetchImpl);
+    const result = await publish({ ...draft, topic: "not a topic!" }, blip, fetchImpl);
     if (result.ok) throw new Error("expected the topic to be refused");
     expect(result.retryable).toBe(false);
-    expect(result.message).toContain("@alice/tickets");
+    expect(result.message).toContain("not a topic!");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
