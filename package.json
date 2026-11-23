@@ -27,7 +27,7 @@
     "eslint": "^10.14.0",
     "jsdom": "^31.0.1",
     "prettier": "^3.10.1",
-    "semantic-release": "^25.0.9",
+    "semantic-release": "^26.0.1",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0",
