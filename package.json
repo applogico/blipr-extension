@@ -34,7 +34,7 @@
     "web-ext": "^10.7.0"
   },
   "dependencies": {
-    "@blipr/js": "^0.2.1",
+    "@blipr/js": "^0.2.2",
     "webextension-polyfill": "^0.12.0"
   }
 }
